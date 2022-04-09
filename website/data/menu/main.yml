@@ -59,6 +59,8 @@ main:
                 ref: "/terminal/stocks/discovery/divcal"
               - name: cramer
                 ref: "/terminal/stocks/discovery/cramer"
+              - name: thalt
+                ref: "/terminal/stocks/discovery/thalt"
           - name: Sector and Industry Analysis (SIA)
             ref: "/terminal/stocks/sia"
             sub:

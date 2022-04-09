@@ -30,6 +30,7 @@ from openbb_terminal.stocks.discovery import (
     seeking_alpha_view,
     shortinterest_view,
     yahoofinance_view,
+    nyse_view
 )
 
 # pylint:disable=C0302
@@ -60,6 +61,7 @@ class DiscoveryController(BaseController):
         "cnews",
         "rtat",
         "divcal",
+        "thalt"
     ]
 
     arkord_sortby_choices = [
@@ -111,6 +113,16 @@ class DiscoveryController(BaseController):
         "Indicated Annual Dividend",
         "Announcement Date",
     ]
+    thalt_choices = [
+        "News-pending",
+        "LULD-pause",
+        "Merger-Effective",
+        "Regulatory-Concern",
+        "News-Released",
+        "New-Security-Offering",
+        "Corporate-Action",
+        "News-dissemination",
+    ]
 
     def __init__(self, queue: List[str] = None):
         """Constructor"""
@@ -128,6 +140,8 @@ class DiscoveryController(BaseController):
             choices["cnews"]["--type"] = {c: None for c in self.cnews_type_choices}
             choices["divcal"]["-s"] = {c: None for c in self.dividend_columns}
             choices["divcal"]["--sort"] = {c: None for c in self.dividend_columns}
+            choices["thalt"]["-r"] = {c: None for c in self.thalt_choices}
+            choices["thalt"]["--reason"] = {c: None for c in self.thalt_choices}
 
             self.completer = NestedCompleter.from_nested_dict(choices)
 
@@ -157,6 +171,8 @@ class DiscoveryController(BaseController):
     lowfloat       low float stocks under 10M shares float
 [src][Pennystockflow.com][/src]
     hotpenny       today's hot penny stocks
+[src][NYSE][/src]
+    thalt          trading halts
 [src][NASDAQ Data Link (Formerly Quandl)][/src]
     rtat           top 10 retail traded stocks per day
     divcal         dividend calendar for selected date[/cmds]
@@ -882,4 +898,56 @@ class DiscoveryController(BaseController):
         if ns_parser:
             nasdaq_view.display_top_retail(
                 n_days=ns_parser.limit, export=ns_parser.export
+            )
+
+    @log_start_end(log=logger)
+    def call_thalt(self, other_args: List[str]):
+        """Process thalt command"""
+        parser = argparse.ArgumentParser(
+            add_help=False,
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            prog="thalt",
+            description="""
+                View trading halt of stocks
+            """,
+        )
+        parser.add_argument(
+            "-l",
+            "--l",
+            action="store",
+            dest="limit",
+            type=check_int_range(1, 500),
+            default=20,
+            help="Limit of trading halts to retrieve",
+        )
+        parser.add_argument(
+            "-t",
+            "--ticker",
+            action="store",
+            dest="ticker",
+            type=str,
+            default="",
+            help="Stock Ticker",
+        )
+        parser.add_argument(
+            "-r",
+            "--reason",
+            action="store",
+            dest="reason",
+            type=str,
+            default="",
+            choices=self.thalt_choices,
+            help="Reason for trading halt",
+        )
+        if other_args and "-" not in other_args[0][0]:
+            other_args.insert(0, "-l")
+        ns_parser = parse_known_args_and_warn(
+            parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
+        )
+        if ns_parser:
+            nyse_view.display_trading_halts(
+                ticker=ns_parser.ticker,
+                num_stocks=ns_parser.limit,
+                reason=ns_parser.reason,
+                export=ns_parser.export
             )
