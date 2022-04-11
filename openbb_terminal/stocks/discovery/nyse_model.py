@@ -21,11 +21,15 @@ def get_trading_halts(ticker: str, reason: str) -> pd.DataFrame:
     pd.DataFrame
         Trading Halts
     """
-    data = pd.read_csv(f"https://www.nyse.com/api/trade-halts/historical/download?haltDateFrom="
-                       f"{str(datetime.utcnow().date() - timedelta(days=365))}")
+    data = pd.read_csv(
+        f"https://www.nyse.com/api/trade-halts/historical/download?haltDateFrom="
+        f"{str(datetime.utcnow().date() - timedelta(days=365))}"
+    )
     data.fillna("N/A", inplace=True)
     del data["Name"]
-    data.rename(columns={"Symbol": "Ticker", "NYSE Resume Time": "Resume Time"}, inplace=True)
+    data.rename(
+        columns={"Symbol": "Ticker", "NYSE Resume Time": "Resume Time"}, inplace=True
+    )
     if ticker:
         data = data[data["Ticker"] == ticker.upper()]
     if reason:

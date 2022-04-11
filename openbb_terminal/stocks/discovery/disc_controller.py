@@ -30,7 +30,7 @@ from openbb_terminal.stocks.discovery import (
     seeking_alpha_view,
     shortinterest_view,
     yahoofinance_view,
-    nyse_view
+    nyse_view,
 )
 
 # pylint:disable=C0302
@@ -61,7 +61,7 @@ class DiscoveryController(BaseController):
         "cnews",
         "rtat",
         "divcal",
-        "thalt"
+        "thalt",
     ]
 
     arkord_sortby_choices = [
@@ -949,5 +949,5 @@ class DiscoveryController(BaseController):
                 ticker=ns_parser.ticker,
                 num_stocks=ns_parser.limit,
                 reason=ns_parser.reason,
-                export=ns_parser.export
+                export=ns_parser.export,
             )

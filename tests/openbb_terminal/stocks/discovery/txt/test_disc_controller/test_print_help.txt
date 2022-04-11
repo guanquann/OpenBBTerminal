@@ -22,6 +22,8 @@
     lowfloat       low float stocks under 10M shares float
 [Pennystockflow.com]
     hotpenny       today's hot penny stocks
+[NYSE]
+    thalt          trading halts
 [NASDAQ Data Link (Formerly Quandl)]
     rtat           top 10 retail traded stocks per day
     divcal         dividend calendar for selected date
