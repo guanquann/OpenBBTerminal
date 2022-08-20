@@ -37,20 +37,19 @@ def view_overview(symbol: str, export: str = ""):
         title="ETF Overview Information",
         show_index=True,
     )
-    console.print("")
 
     export_data(export, os.path.dirname(os.path.abspath(__file__)), "overview", data)
 
 
 @log_start_end(log=logger)
-def view_holdings(symbol: str, num_to_show: int, export: str):
+def view_holdings(symbol: str, limit: int = 10, export: str = ""):
     """
 
     Parameters
     ----------
     symbol: str
         ETF symbol to show holdings for
-    num_to_show: int
+    limit: int
         Number of holdings to show
     export: str
         Format to export data
@@ -58,18 +57,17 @@ def view_holdings(symbol: str, num_to_show: int, export: str):
 
     data = stockanalysis_model.get_etf_holdings(symbol)
     print_rich_table(
-        data[:num_to_show],
+        data[:limit],
         headers=list(data.columns),
         title="ETF Holdings",
         show_index=True,
     )
-    console.print("")
 
     export_data(export, os.path.dirname(os.path.abspath(__file__)), "holdings", data)
 
 
 @log_start_end(log=logger)
-def view_comparisons(symbols: List[str], export: str):
+def view_comparisons(symbols: List[str], export: str = ""):
     """Show ETF comparisons
 
     Parameters
@@ -93,12 +91,12 @@ def view_comparisons(symbols: List[str], export: str):
     print_rich_table(
         data, headers=list(data.columns), title="ETF Comparisons", show_index=True
     )
-    console.print("")
+
     export_data(export, os.path.dirname(os.path.abspath(__file__)), "overview", data)
 
 
 @log_start_end(log=logger)
-def display_etf_by_name(name: str, limit: int, export: str):
+def display_etf_by_name(name: str, limit: int = 10, export: str = ""):
     """Display ETFs matching search string. [Source: StockAnalysis]
 
     Parameters
@@ -118,7 +116,6 @@ def display_etf_by_name(name: str, limit: int, export: str):
         show_index=False,
         title="ETF Search Result",
     )
-    console.print("")
 
     export_data(
         export,

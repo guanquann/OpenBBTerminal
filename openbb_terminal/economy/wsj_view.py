@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 
 @log_start_end(log=logger)
-def display_overview(export: str):
-    """Market overview. [Source: Wall St. Journal]
+def display_overview(export: str = ""):
+    """Market overview with daily change. [Source: Wall St. Journal]
 
     Parameters
     ----------
@@ -33,8 +33,6 @@ def display_overview(export: str):
         title="Market Overview",
     )
 
-    console.print("")
-
     export_data(
         export,
         os.path.dirname(os.path.abspath(__file__)),
@@ -44,7 +42,7 @@ def display_overview(export: str):
 
 
 @log_start_end(log=logger)
-def display_indices(export: str):
+def display_indices(export: str = ""):
     """US indices. [Source: Wall St. Journal]
 
     Parameters
@@ -60,7 +58,6 @@ def display_indices(export: str):
     print_rich_table(
         df_data, show_index=False, headers=list(df_data.columns), title="US Indices"
     )
-    console.print("")
 
     export_data(
         export,
@@ -71,7 +68,7 @@ def display_indices(export: str):
 
 
 @log_start_end(log=logger)
-def display_futures(export: str):
+def display_futures(export: str = ""):
     """Futures/Commodities. [Source: Wall St. Journal]
 
     Parameters
@@ -90,7 +87,6 @@ def display_futures(export: str):
         headers=list(df_data.columns),
         title="Futures/Commodities [Source: Wall St. Journal]",
     )
-    console.print("")
 
     export_data(
         export,
@@ -101,7 +97,7 @@ def display_futures(export: str):
 
 
 @log_start_end(log=logger)
-def display_usbonds(export: str):
+def display_usbonds(export: str = ""):
     """US bonds. [Source: Wall St. Journal]
 
     Parameters
@@ -117,7 +113,6 @@ def display_usbonds(export: str):
     print_rich_table(
         df_data, show_index=False, headers=list(df_data.columns), title="US Bonds"
     )
-    console.print("")
 
     export_data(
         export,
@@ -128,7 +123,7 @@ def display_usbonds(export: str):
 
 
 @log_start_end(log=logger)
-def display_glbonds(export: str):
+def display_glbonds(export: str = ""):
     """Global bonds. [Source: Wall St. Journal]
 
     Parameters
@@ -144,7 +139,6 @@ def display_glbonds(export: str):
     print_rich_table(
         df_data, show_index=False, headers=list(df_data.columns), title="Global Bonds"
     )
-    console.print("")
 
     export_data(
         export,
@@ -155,7 +149,7 @@ def display_glbonds(export: str):
 
 
 @log_start_end(log=logger)
-def display_currencies(export: str):
+def display_currencies(export: str = ""):
     """Display currencies. [Source: Wall St. Journal]
 
     Parameters
@@ -171,7 +165,6 @@ def display_currencies(export: str):
     print_rich_table(
         df_data, show_index=False, headers=list(df_data.columns), title="Currencies"
     )
-    console.print("")
 
     export_data(
         export,

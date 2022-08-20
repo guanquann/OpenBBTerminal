@@ -18,19 +18,19 @@ from openbb_terminal.helper_funcs import (
     print_rich_table,
     reindex_dates,
     is_intraday,
+    is_valid_axes_count,
 )
-from openbb_terminal.rich_config import console
 
 logger = logging.getLogger(__name__)
 
 
 @log_start_end(log=logger)
 def fibonacci_retracement(
-    ohlc: pd.DataFrame,
+    data: pd.DataFrame,
     period: int = 120,
     start_date: Optional[Union[str, None]] = None,
     end_date: Optional[Union[str, None]] = None,
-    s_ticker: str = "",
+    symbol: str = "",
     export: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
 ):
@@ -38,20 +38,20 @@ def fibonacci_retracement(
 
     Parameters
     ----------
-    ohlc: pd.DataFrame
-        Stock data
+    data: pd.DataFrame
+        OHLC data
     period: int
         Days to lookback
     start_date: Optional[str, None]
         User picked date for starting retracement
     end_date: Optional[str, None]
         User picked date for ending retracement
-    s_ticker:str
-        Stock ticker
+    symbol: str
+        Ticker symbol
     export: str
         Format to export data
     external_axes : Optional[List[plt.Axes]], optional
-        External axes (2 axis is expected in the list), by default None
+        External axes (2 axes are expected in the list), by default None
     """
     (
         df_fib,
@@ -59,29 +59,27 @@ def fibonacci_retracement(
         max_date,
         min_pr,
         max_pr,
-    ) = custom_indicators_model.calculate_fib_levels(ohlc, period, start_date, end_date)
+    ) = custom_indicators_model.calculate_fib_levels(data, period, start_date, end_date)
 
     levels = df_fib.Price
 
-    plot_data = reindex_dates(ohlc)
+    plot_data = reindex_dates(data)
 
-    # This plot has 1 axes
+    # This plot has 2 axes
     if external_axes is None:
         _, ax1 = plt.subplots(
             figsize=plot_autoscale(),
             dpi=PLOT_DPI,
         )
         ax2 = ax1.twinx()
+    elif is_valid_axes_count(external_axes, 2):
+        (ax1, ax2) = external_axes
     else:
-        if len(external_axes) != 1:
-            logger.error("Expected list of one axis item.")
-            console.print("[red]Expected list of 1 axis item./n[/red]")
-            return
-        ax1, ax2 = external_axes
+        return
 
     ax1.plot(plot_data["Adj Close"])
 
-    if is_intraday(ohlc):
+    if is_intraday(data):
         date_format = "%b %d %H:%M"
     else:
         date_format = "%Y-%m-%d"
@@ -103,7 +101,7 @@ def fibonacci_retracement(
         ax1.fill_between(plot_data.index, levels[i], levels[i + 1], alpha=0.15)
 
     ax1.set_xlim(plot_data.index[0], plot_data.index[-1])
-    ax1.set_title(f"Fibonacci Support for {s_ticker.upper()}")
+    ax1.set_title(f"Fibonacci Support for {symbol.upper()}")
     ax1.set_yticks(levels)
     ax1.set_yticklabels([0, 0.235, 0.382, 0.5, 0.618, 0.65, 1])
     theme.style_primary_axis(
@@ -124,7 +122,6 @@ def fibonacci_retracement(
             show_index=False,
             title="Fibonacci retracement levels",
         )
-        console.print("")
 
     export_data(
         export,

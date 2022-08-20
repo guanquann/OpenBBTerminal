@@ -1,5 +1,6 @@
 # IMPORTATION STANDARD
 import argparse
+import datetime
 import logging
 from typing import List
 
@@ -9,7 +10,10 @@ from prompt_toolkit.completion import NestedCompleter
 # IMPORTATION INTERNAL
 from openbb_terminal import feature_flags as obbff
 from openbb_terminal.decorators import log_start_end
-from openbb_terminal.helper_funcs import parse_known_args_and_warn
+from openbb_terminal.helper_funcs import (
+    EXPORT_ONLY_RAW_DATA_ALLOWED,
+    valid_date,
+)
 from openbb_terminal.menu import session
 from openbb_terminal.parent_classes import BaseController
 from openbb_terminal.portfolio.brokers.degiro.degiro_view import DegiroView
@@ -32,6 +36,7 @@ class DegiroController(BaseController):
         "pending",
         "topnews",
         "update",
+        "paexport",
     ]
     PATH = "/portfolio/bro/degiro/"
 
@@ -63,7 +68,7 @@ class DegiroController(BaseController):
             help="Order's id.",
             type=str,
         )
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
 
         self.__degiro_view.cancel(ns_parser=ns_parser)
 
@@ -81,7 +86,7 @@ class DegiroController(BaseController):
             type=str,
             help="ISIN code of the company.",
         )
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
 
         self.__degiro_view.companynews(ns_parser=ns_parser)
 
@@ -160,7 +165,7 @@ class DegiroController(BaseController):
             required=False,
             type=str,
         )
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
 
         self.__degiro_view.create(ns_parser=ns_parser)
 
@@ -173,7 +178,7 @@ class DegiroController(BaseController):
             add_help=False,
             prog="hold",
         )
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
 
         self.__degiro_view.hold(ns_parser=ns_parser)
 
@@ -194,7 +199,7 @@ class DegiroController(BaseController):
             help="Number of news to display.",
             required=False,
         )
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
 
         self.__degiro_view.lastnews(ns_parser=ns_parser)
 
@@ -207,10 +212,18 @@ class DegiroController(BaseController):
             add_help=False,
             prog="login",
         )
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        parser.add_argument(
+            "-otp",
+            "--one-time-password",
+            default=None,
+            help="One-time-password for 2FA.",
+            required=False,
+            type=int,
+        )
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
 
         if ns_parser:
-            self.__degiro_view.login()
+            self.__degiro_view.login(otp=ns_parser.one_time_password)
 
     @log_start_end(log=logger)
     def call_logout(self, other_args: List[str]):
@@ -221,7 +234,7 @@ class DegiroController(BaseController):
             add_help=False,
             prog="logout",
         )
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
 
         if ns_parser:
             self.__degiro_view.logout()
@@ -254,7 +267,7 @@ class DegiroController(BaseController):
             default=0,
             help="To use an offset.",
         )
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
 
         self.__degiro_view.lookup(ns_parser=ns_parser)
 
@@ -267,7 +280,7 @@ class DegiroController(BaseController):
             add_help=False,
             prog="pending",
         )
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
 
         self.__degiro_view.pending(ns_parser=ns_parser)
 
@@ -280,7 +293,7 @@ class DegiroController(BaseController):
             add_help=False,
             prog="topnews",
         )
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
 
         self.__degiro_view.topnews(ns_parser=ns_parser)
 
@@ -305,6 +318,47 @@ class DegiroController(BaseController):
             required="-h" not in other_args,
             type=float,
         )
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
 
         self.__degiro_view.update(ns_parser=ns_parser)
+
+    @log_start_end(log=logger)
+    def call_paexport(self, other_args: List[str]):
+        """Export transactions for Portfolio menu into csv format. The transactions
+        file is exported to the portfolio/holdings folder and can be loaded directly
+        in the Portfolio menu."""
+
+        # PARSING ARGS
+        parser = argparse.ArgumentParser(
+            add_help=False,
+            prog="paexport",
+        )
+        parser.add_argument(
+            "-s",
+            "--start",
+            help="Start date.",
+            required=True,
+            type=valid_date,
+        )
+        parser.add_argument(
+            "-e",
+            "--end",
+            help="End date.",
+            type=valid_date,
+            default=datetime.datetime.now(),
+        )
+        parser.add_argument(
+            "-c",
+            "--currency",
+            help="Used currency.",
+            default="USD",
+            type=str,
+        )
+        ns_parser = self.parse_known_args_and_warn(
+            parser,
+            other_args,
+            export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED,
+        )
+
+        if ns_parser:
+            self.__degiro_view.transactions_export(ns_parser=ns_parser)

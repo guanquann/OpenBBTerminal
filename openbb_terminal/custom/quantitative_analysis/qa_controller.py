@@ -18,7 +18,6 @@ from openbb_terminal.helper_funcs import (
     EXPORT_ONLY_RAW_DATA_ALLOWED,
     check_positive,
     check_proportion_range,
-    parse_known_args_and_warn,
     check_list_dates,
 )
 from openbb_terminal.menu import session
@@ -78,6 +77,10 @@ class QaController(BaseController):
             choices["pick"] = {c: None for c in list(custom_df.columns)}
             choices["load"] = {c: None for c in self.DATA_FILES}
             self.choices = choices
+
+            choices["support"] = self.SUPPORT_CHOICES
+            choices["about"] = self.ABOUT_CHOICES
+
             self.completer = NestedCompleter.from_nested_dict(choices)
 
     def custom_reset(self):
@@ -144,9 +147,7 @@ class QaController(BaseController):
             type=str,
         )
 
-        if other_args and "-" not in other_args[0][0]:
-            other_args.insert(0, "-f")
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             file = Path("custom_imports") / ns_parser.file
             self.df = custom_model.load(file)
@@ -181,7 +182,7 @@ class QaController(BaseController):
         if other_args and "-t" not in other_args and "-h" not in other_args:
             other_args.insert(0, "-t")
 
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             self.target = ns_parser.target
         console.print("")
@@ -213,15 +214,15 @@ class QaController(BaseController):
             help="Sort in descending order",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             qa_view.display_raw(
-                self.df[self.target],
-                num=ns_parser.limit,
-                sort="",
-                des=ns_parser.descend,
+                data=self.df[self.target],
+                limit=ns_parser.limit,
+                sortby="",
+                descend=ns_parser.descend,
                 export=ns_parser.export,
             )
 
@@ -236,11 +237,11 @@ class QaController(BaseController):
                 Summary statistics
             """,
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
-            qa_view.display_summary(df=self.df, export=ns_parser.export)
+            qa_view.display_summary(data=self.df, export=ns_parser.export)
 
     @log_start_end(log=logger)
     def call_line(self, other_args: List[str]):
@@ -281,7 +282,7 @@ class QaController(BaseController):
             default="",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_FIGURES_ALLOWED
         )
         if ns_parser:
@@ -308,11 +309,11 @@ class QaController(BaseController):
         parser.add_argument(
             "-b", "--bins", type=check_positive, default=15, dest="n_bins"
         )
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             qa_view.display_hist(
                 name=self.ticker,
-                df=self.df,
+                data=self.df,
                 target=self.target,
                 bins=ns_parser.n_bins,
             )
@@ -328,13 +329,13 @@ class QaController(BaseController):
                 Cumulative distribution function
             """,
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             qa_view.display_cdf(
                 name=self.ticker,
-                df=self.df,
+                data=self.df,
                 target=self.target,
                 export=ns_parser.export,
             )
@@ -358,11 +359,11 @@ class QaController(BaseController):
             dest="year",
             help="Flag to show yearly bw plot",
         )
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             qa_view.display_bw(
                 name=self.ticker,
-                df=self.df,
+                data=self.df,
                 target=self.target,
                 yearly=ns_parser.year,
             )
@@ -388,13 +389,13 @@ class QaController(BaseController):
             dest="multiplicative",
             help="decompose using multiplicative model instead of additive",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             qa_view.display_seasonal(
                 name=self.ticker,
-                df=self.df,
+                data=self.df,
                 target=self.target,
                 multiplicative=ns_parser.multiplicative,
                 export=ns_parser.export,
@@ -433,10 +434,10 @@ class QaController(BaseController):
             / 80,
             help="drift",
         )
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             qa_view.display_cusum(
-                df=self.df,
+                data=self.df,
                 target=self.target,
                 threshold=ns_parser.threshold,
                 drift=ns_parser.drift,
@@ -461,11 +462,11 @@ class QaController(BaseController):
             default=15,
             help="maximum lags to display in plots",
         )
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             qa_view.display_acf(
                 name=self.ticker,
-                df=self.df,
+                data=self.df,
                 target=self.target,
                 lags=ns_parser.lags,
             )
@@ -490,13 +491,13 @@ class QaController(BaseController):
             default=14,
             help="Window length",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             rolling_view.display_mean_std(
-                name=self.ticker,
-                df=self.df,
+                symbol=self.ticker,
+                data=self.df,
                 target=self.target,
                 window=ns_parser.n_window,
                 export=ns_parser.export,
@@ -521,13 +522,13 @@ class QaController(BaseController):
             default=14,
             help="Window length",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             rolling_view.display_spread(
                 name=self.ticker,
-                df=self.df,
+                data=self.df,
                 target=self.target,
                 window=ns_parser.n_window,
                 export=ns_parser.export,
@@ -569,13 +570,13 @@ class QaController(BaseController):
             default=0.5,
             help="quantile",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             rolling_view.display_quantile(
                 name=self.ticker,
-                df=self.df,
+                data=self.df,
                 target=self.target,
                 window=ns_parser.n_window,
                 quantile=ns_parser.f_quantile,
@@ -607,13 +608,13 @@ class QaController(BaseController):
             default=14,
             help="length",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             rolling_view.display_skew(
                 name=self.ticker,
-                df=self.df,
+                data=self.df,
                 target=self.target,
                 window=ns_parser.n_length,
                 export=ns_parser.export,
@@ -644,13 +645,13 @@ class QaController(BaseController):
             default=14,
             help="length",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             rolling_view.display_kurtosis(
                 name=self.ticker,
-                df=self.df,
+                data=self.df,
                 target=self.target,
                 window=ns_parser.n_length,
                 export=ns_parser.export,
@@ -667,12 +668,12 @@ class QaController(BaseController):
                 Normality tests
             """,
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             qa_view.display_normality(
-                df=self.df, target=self.target, export=ns_parser.export
+                data=self.df, target=self.target, export=ns_parser.export
             )
 
     @log_start_end(log=logger)
@@ -686,9 +687,9 @@ class QaController(BaseController):
                 Display QQ plot vs normal quantiles
             """,
         )
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
-            qa_view.display_qqplot(name=self.ticker, df=self.df, target=self.target)
+            qa_view.display_qqplot(name=self.ticker, data=self.df, target=self.target)
 
     @log_start_end(log=logger)
     def call_unitroot(self, other_args: List[str]):
@@ -719,12 +720,12 @@ class QaController(BaseController):
             dest="kpss_reg",
             default="c",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             qa_view.display_unitroot(
-                df=self.df,
+                data=self.df,
                 target=self.target,
                 fuller_reg=ns_parser.fuller_reg,
                 kpss_reg=ns_parser.kpss_reg,

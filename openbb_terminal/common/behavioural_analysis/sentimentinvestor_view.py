@@ -4,7 +4,7 @@ __docformat__ = "numpy"
 import logging
 import os
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timedelta
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
 import pandas as pd
@@ -19,6 +19,7 @@ from openbb_terminal.helper_funcs import (
     export_data,
     print_rich_table,
     plot_autoscale,
+    is_valid_axes_count,
 )
 
 
@@ -28,13 +29,13 @@ logger = logging.getLogger(__name__)
 @log_start_end(log=logger)
 @check_api_key(["API_SENTIMENTINVESTOR_TOKEN"])
 def display_historical(
-    ticker: str,
-    start: str,
-    end: str,
-    export: str = "",
+    symbol: str,
+    start_date: str = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d"),
+    end_date: str = datetime.utcnow().strftime("%Y-%m-%d"),
     number: int = 100,
     raw: bool = False,
     limit: int = 10,
+    export: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
 ):
     """Display historical sentiment data of a ticker,
@@ -42,13 +43,13 @@ def display_historical(
 
     Parameters
     ----------
-    ticker: str
-        Ticker to view sentiment data
-    start: str
+    symbol: str
+        Ticker symbol to view sentiment data
+    start_date: str
         Initial date like string or unix timestamp (e.g. 2021-12-21)
-    end: str
+    end_date: str
         End date like string or unix timestamp (e.g. 2022-01-15)
-    number : int
+    number: int
         Number of results returned by API call
         Maximum 250 per api call
     raw: boolean
@@ -56,37 +57,37 @@ def display_historical(
     limit: int
         Number of results display on the terminal
         Default: 10
-    external_axes : Optional[List[plt.Axes]], optional
-        External axes (2 axis is expected in the list), by default None
+    export: str
+        Format to export data
+    external_axes: Optional[List[plt.Axes]], optional
+        External axes (2 axes are expected in the list), by default None
     Returns
     -------
     """
 
-    supported_ticker = sentimentinvestor_model.check_supported_ticker(ticker)
+    supported_ticker = sentimentinvestor_model.check_supported_ticker(symbol)
 
     # Check to see if the ticker is supported
     if not supported_ticker:
         logger.error("Ticker not supported")
         console.print(
-            f"[red]Ticker {ticker} not supported. Please try another one![/red]\n"
+            f"[red]Ticker {symbol} not supported. Please try another one![/red]\n"
         )
         return
 
-    df = sentimentinvestor_model.get_historical(ticker, start, end, number)
+    df = sentimentinvestor_model.get_historical(symbol, start_date, end_date, number)
 
     if df.empty:
         return
 
-    # This plot has 2 axis
+    # This plot has 2 axes
     if external_axes is None:
         _, ax1 = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
         ax2 = ax1.twinx()
-    else:
-        if len(external_axes) != 2:
-            logger.error("Expected list of two axis items.")
-            console.print("[red]Expected list of 2 axis item.[/red]\n")
-            return
+    elif is_valid_axes_count(external_axes, 2):
         (ax1, ax2) = external_axes
+    else:
+        return
 
     ax1.plot(df.index, df["RHI"], color=theme.get_colors()[0])
 
@@ -145,18 +146,18 @@ def display_historical(
 @log_start_end(log=logger)
 @check_api_key(["API_SENTIMENTINVESTOR_TOKEN"])
 def display_trending(
-    start: datetime,
-    hour: int,
-    export: str,
+    start_date: datetime = datetime.today(),
+    hour: int = 0,
     number: int = 10,
     limit: int = 10,
+    export: str = "",
 ):
     """Display most talked about tickers within
     the last hour together with their sentiment data.
 
     Parameters
     ----------
-    start: datetime
+    start_date: datetime
         Datetime object (e.g. datetime(2021, 12, 21)
     hour: int
         Hour of the day in 24-hour notation (e.g. 14)
@@ -166,12 +167,15 @@ def display_trending(
     limit: int
         Number of results display on the terminal
         Default: 10
-    -------
-    Returns
-        None
+    export: str
+        Format to export data
     """
 
-    df = sentimentinvestor_model.get_trending(start, hour, number)
+    # Force datetime format to be datetime(year, month, day, 0, 0)
+    # 0 hours and minutes to look since day starts
+    start_date = datetime(start_date.year, start_date.month, start_date.day)
+
+    df = sentimentinvestor_model.get_trending(start_date, hour, number)
 
     if df.empty:
         return

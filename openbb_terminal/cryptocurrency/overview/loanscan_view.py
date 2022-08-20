@@ -11,6 +11,7 @@ from openbb_terminal.helper_funcs import (
     export_data,
     plot_autoscale,
     print_rich_table,
+    is_valid_axes_count,
 )
 from openbb_terminal.rich_config import console
 from openbb_terminal import config_terminal as cfg
@@ -21,9 +22,9 @@ logger = logging.getLogger(__name__)
 
 @log_start_end(log=logger)
 def display_crypto_rates(
-    cryptos: str,
+    symbols: str,
     platforms: str,
-    rate_type: str,
+    rate_type: str = "borrow",
     limit: int = 10,
     export: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
@@ -35,7 +36,7 @@ def display_crypto_rates(
     ----------
     rate_type: str
         Interest rate type: {borrow, supply}. Default: supply
-    cryptos: str
+    symbols: str
         Crypto separated by commas. Default: BTC,ETH,USDT,USDC
     platforms: str
         Platforms separated by commas. Default: BlockFi,Ledn,SwissBorg,Youhodler
@@ -48,17 +49,15 @@ def display_crypto_rates(
     if df.empty:
         console.print("\nError in loanscan request\n")
     else:
-        df = df[cryptos.upper().split(",")].loc[platforms.lower().split(",")]
+        df = df[symbols.upper().split(",")].loc[platforms.lower().split(",")]
         df = df.sort_values(df.columns[0], ascending=False, na_position="last")
 
         if not external_axes:
             _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
-        else:
-            if len(external_axes) != 1:
-                logger.error("Expected list of one axis item.")
-                console.print("[red]Expected list of one axis item./n[/red]")
-                return
+        elif is_valid_axes_count(external_axes, 1):
             (ax,) = external_axes
+        else:
+            return
 
         df_non_null = pd.melt(df.reset_index(), id_vars=["index"]).dropna()
 
@@ -109,7 +108,6 @@ def display_crypto_rates(
             show_index=True,
             title=f"Crypto {rate_type.capitalize()} Interest Rates",
         )
-        console.print("")
 
         export_data(
             export,

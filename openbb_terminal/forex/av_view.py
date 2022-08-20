@@ -39,7 +39,11 @@ def display_quote(to_symbol: str, from_symbol: str):
         )
         return
 
-    df = pd.DataFrame.from_dict(quote)
+    try:
+        df = pd.DataFrame.from_dict(quote)
+    except ValueError:
+        console.print(f"[red]{quote['Information']}[/red]\n")
+        return
     df.index = df.index.to_series().apply(lambda x: x[3:]).values
     df = df.iloc[[0, 2, 5, 4, 7, 8]]
     print_rich_table(
@@ -47,4 +51,3 @@ def display_quote(to_symbol: str, from_symbol: str):
         show_index=True,
         title=f"[bold]{from_symbol}/{to_symbol} Quote [/bold]",
     )
-    console.print("")

@@ -14,9 +14,9 @@ import pandas as pd
 from openbb_terminal.decorators import log_start_end
 from openbb_terminal.helper_funcs import (
     lambda_financials_colored_values,
-    parse_known_args_and_warn,
     patch_pandas_text_adjustment,
     print_rich_table,
+    parse_simple_args,
 )
 from openbb_terminal.rich_config import console
 from openbb_terminal.stocks.fundamental_analysis import market_watch_model as mwm
@@ -73,11 +73,14 @@ def income(other_args: List[str], ticker: str):
         help="Quarter fundamental data flag.",
     )
 
-    ns_parser = parse_known_args_and_warn(parser, other_args)
+    ns_parser = parse_simple_args(parser, other_args)
     if not ns_parser:
         return
 
     df_financials = mwm.prepare_df_financials(ticker, "income", ns_parser.b_quarter)
+    if len(df_financials) == 0 or df_financials.empty:
+        console.print("Marketwatch does not yet provide financials for this ticker")
+        return
 
     if rich_config.USE_COLOR:
         df_financials = df_financials.applymap(lambda_financials_colored_values)
@@ -150,11 +153,14 @@ def balance(other_args: List[str], ticker: str):
         help="Quarter fundamental data flag.",
     )
 
-    ns_parser = parse_known_args_and_warn(parser, other_args)
+    ns_parser = parse_simple_args(parser, other_args)
     if not ns_parser:
         return
 
     df_financials = mwm.prepare_df_financials(ticker, "balance", ns_parser.b_quarter)
+    if len(df_financials) == 0 or df_financials.empty:
+        console.print("Marketwatch does not yet provide financials for this ticker")
+        return
 
     if rich_config.USE_COLOR:
         df_financials = df_financials.applymap(lambda_financials_colored_values)
@@ -223,11 +229,14 @@ def cash(other_args: List[str], ticker: str):
         help="Quarter fundamental data flag.",
     )
 
-    ns_parser = parse_known_args_and_warn(parser, other_args)
+    ns_parser = parse_simple_args(parser, other_args)
     if not ns_parser:
         return
 
     df_financials = mwm.prepare_df_financials(ticker, "cashflow", ns_parser.b_quarter)
+    if len(df_financials) == 0 or df_financials.empty:
+        console.print("Marketwatch does not yet provide financials for this ticker")
+        return
 
     if rich_config.USE_COLOR:
         df_financials = df_financials.applymap(lambda_financials_colored_values)
@@ -244,20 +253,20 @@ def cash(other_args: List[str], ticker: str):
 
 
 @log_start_end(log=logger)
-def display_sean_seah_warnings(ticker: str, debug: bool = False):
+def display_sean_seah_warnings(symbol: str, debug: bool = False):
     """Display Sean Seah warnings
 
     Parameters
     ----------
     other_args : List[str]
         argparse other args
-    ticker : str
+    symbol : str
         Stock ticker
     """
-    financials, warnings, debugged_warnings = mwm.get_sean_seah_warnings(ticker, debug)
+    financials, warnings, debugged_warnings = mwm.get_sean_seah_warnings(symbol, debug)
 
     if financials.empty:
-        console.print(f"No financials found for {ticker}\n")
+        console.print(f"No financials found for {symbol}\n")
         return
 
     print_rich_table(

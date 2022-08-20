@@ -19,7 +19,7 @@ EMPTY_DF = pd.DataFrame()
 @pytest.mark.parametrize(
     "queue, expected",
     [
-        (["ema", "help"], []),
+        (["ema", "help"], ["help"]),
         (["quit", "help"], ["help"]),
     ],
 )
@@ -75,7 +75,7 @@ def test_menu_without_queue_completion(mocker):
         queue=None,
     ).menu()
 
-    assert result_menu == []
+    assert result_menu == ["help"]
 
 
 @pytest.mark.vcr(record_mode="none")
@@ -124,7 +124,7 @@ def test_menu_without_queue_sys_exit(mock_input, mocker):
         queue=None,
     ).menu()
 
-    assert result_menu == []
+    assert result_menu == ["help"]
 
 
 @pytest.mark.vcr(record_mode="none")
@@ -224,8 +224,8 @@ def test_call_func_expect_queue(expected_queue, queue, func):
             "bt_view.display_simple_ema",
             ["-l=2", "--spy", "--no_bench", "--export=csv"],
             dict(
-                ticker="MOCK_TICKER",
-                df_stock=EMPTY_DF,
+                symbol="MOCK_TICKER",
+                data=EMPTY_DF,
                 ema_length=2,
                 spy_bt=True,
                 no_bench=True,
@@ -245,8 +245,8 @@ def test_call_func_expect_queue(expected_queue, queue, func):
                 "--export=csv",
             ],
             dict(
-                ticker="MOCK_TICKER",
-                df_stock=EMPTY_DF,
+                symbol="MOCK_TICKER",
+                data=EMPTY_DF,
                 short_ema=20,
                 long_ema=10,
                 spy_bt=True,
@@ -268,8 +268,8 @@ def test_call_func_expect_queue(expected_queue, queue, func):
                 "--export=csv",
             ],
             dict(
-                ticker="MOCK_TICKER",
-                df_stock=EMPTY_DF,
+                symbol="MOCK_TICKER",
+                data=EMPTY_DF,
                 periods=2,
                 low_rsi=20,
                 high_rsi=10,
@@ -313,7 +313,7 @@ def test_call_func(tested_func, mocked_func, other_args, called_with, mocker):
 )
 def test_call_func_no_parser(func, mocker):
     mocker.patch(
-        "openbb_terminal.stocks.backtesting.bt_controller.parse_known_args_and_warn",
+        "openbb_terminal.stocks.backtesting.bt_controller.BacktestingController.parse_known_args_and_warn",
         return_value=None,
     )
     controller = bt_controller.BacktestingController(
@@ -324,7 +324,7 @@ def test_call_func_no_parser(func, mocker):
     func_result = getattr(controller, func)(other_args=list())
     assert func_result is None
     assert not controller.queue
-    getattr(bt_controller, "parse_known_args_and_warn").assert_called_once()
+    controller.parse_known_args_and_warn.assert_called_once()
 
 
 @pytest.mark.vcr(record_mode="none")

@@ -45,12 +45,11 @@ from openbb_terminal.helper_funcs import (
     EXPORT_ONLY_FIGURES_ALLOWED,
     EXPORT_ONLY_RAW_DATA_ALLOWED,
     check_positive,
-    parse_known_args_and_warn,
     valid_date,
 )
 from openbb_terminal.menu import session
 from openbb_terminal.parent_classes import BaseController
-from openbb_terminal.rich_config import console
+from openbb_terminal.rich_config import console, MenuText
 
 logger = logging.getLogger(__name__)
 
@@ -138,52 +137,46 @@ class OverviewController(BaseController):
             choices["cpinfo"]["-s"] = {c: None for c in coinpaprika_model.INFO_FILTERS}
             choices["cbpairs"]["-s"] = {c: None for c in coinbase_model.PAIRS_FILTERS}
             choices["news"]["-k"] = {c: None for c in cryptopanic_model.CATEGORIES}
-            choices["news"]["-f"] = {c: None for c in cryptopanic_model.FILTERS}
+            choices["news"]["--filter"] = {c: None for c in cryptopanic_model.FILTERS}
             choices["news"]["-r"] = {c: None for c in cryptopanic_model.REGIONS}
             choices["news"]["-s"] = {c: None for c in cryptopanic_model.SORT_FILTERS}
             choices["wfpe"] = {c: None for c in withdrawalfees_model.POSSIBLE_CRYPTOS}
+
+            choices["support"] = self.SUPPORT_CHOICES
+            choices["about"] = self.ABOUT_CHOICES
 
             self.completer = NestedCompleter.from_nested_dict(choices)
 
     def print_help(self):
         """Print help"""
-        help_text = """[cmds]
-[src][CoinGecko][/src]
-    cgglobal          global crypto market info
-    cgdefi            global DeFi market info
-    cgstables         stablecoins
-    cgexchanges       top crypto exchanges
-    cgexrates         coin exchange rates
-    cgindexes         crypto indexes
-    cgderivatives     crypto derivatives
-    cgcategories      crypto categories
-    cghold            ethereum, bitcoin holdings overview statistics
-    hm                crypto heatmap
-[src][CoinPaprika][/src]
-    cpglobal          global crypto market info
-    cpinfo            basic info about all coins available
-    cpmarkets         market related info about all coins available
-    cpexchanges       list all exchanges
-    cpexmarkets       all available markets on given exchange
-    cpplatforms       list blockchain platforms eg. ethereum, solana, kusama, terra
-    cpcontracts       all smart contracts for given platform
-[src][Coinbase][/src]
-    cbpairs           info about available trading pairs
-[src][CryptoPanic][/src]
-    news              recent crypto news
-[src][WithdrawalFees][/src]
-    wf                overall withdrawal fees
-    ewf               overall exchange withdrawal fees
-    wfpe              crypto withdrawal fees per exchange
-[src][BlockchainCenter][/src]
-    altindex          display altcoin season index (if 75% of top 50 coins perform better than BTC)
-    btcrb             display bitcoin rainbow price chart (logarithmic regression)
-[src][Rekt][/src]
-    ch                lists major crypto-related hacks
-[src][LoanScan][/src]
-    cr                crypto supply or borrow interest rates
-"""
-        console.print(text=help_text, menu="Cryptocurrency - Overview")
+        mt = MenuText("crypto/ov/", 105)
+        mt.add_cmd("cgglobal", "CoinGecko")
+        mt.add_cmd("cgdefi", "CoinGecko")
+        mt.add_cmd("cgstables", "CoinGecko")
+        mt.add_cmd("cgexchanges", "CoinGecko")
+        mt.add_cmd("cgexrates", "CoinGecko")
+        mt.add_cmd("cgindexes", "CoinGecko")
+        mt.add_cmd("cgderivatives", "CoinGecko")
+        mt.add_cmd("cgcategories", "CoinGecko")
+        mt.add_cmd("cghold", "CoinGecko")
+        mt.add_cmd("hm", "CoinGecko")
+        mt.add_cmd("cpglobal", "CoinPaprika")
+        mt.add_cmd("cpinfo", "CoinPaprika")
+        mt.add_cmd("cpmarkets", "CoinPaprika")
+        mt.add_cmd("cpexchanges", "CoinPaprika")
+        mt.add_cmd("cpexmarkets", "CoinPaprika")
+        mt.add_cmd("cpplatforms", "CoinPaprika")
+        mt.add_cmd("cpcontracts", "CoinPaprika")
+        mt.add_cmd("cbpairs", "Coinbase")
+        mt.add_cmd("news", "CryptoPanic")
+        mt.add_cmd("wf", "WithdrawalFees")
+        mt.add_cmd("ewf", "WithdrawalFees")
+        mt.add_cmd("wfpe", "WithdrawalFees")
+        mt.add_cmd("altindex", "BlockchainCenter")
+        mt.add_cmd("btcrb", "BlockchainCenter")
+        mt.add_cmd("ch", "Rekt")
+        mt.add_cmd("cr", "LoanScan")
+        console.print(text=mt.menu_text, menu="Cryptocurrency - Overview")
 
     @log_start_end(log=logger)
     def call_hm(self, other_args):
@@ -192,7 +185,7 @@ class OverviewController(BaseController):
             prog="hm",
             add_help=False,
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-            description="""Display cryptocurrencies heatmap [Source: https://coingecko.com]
+            description="""Display cryptocurrencies heatmap with daily percentage change [Source: https://coingecko.com]
             Accepts --category or -c to display only coins of a certain category
             (default no category to display all coins ranked by market cap).
             You can look on only top N number of records with --limit.
@@ -217,7 +210,7 @@ class OverviewController(BaseController):
         if other_args and not other_args[0][0] == "-":
             other_args.insert(0, "-c")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_FIGURES_ALLOWED
         )
         if ns_parser:
@@ -278,7 +271,7 @@ class OverviewController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-s")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
@@ -287,7 +280,7 @@ class OverviewController(BaseController):
                 top=ns_parser.limit,
                 export=ns_parser.export,
                 sortby=" ".join(ns_parser.sortby),
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
             )
 
     @log_start_end(log=logger)
@@ -318,7 +311,7 @@ class OverviewController(BaseController):
             help="Final date. Default is current date",
             default=datetime.now().strftime("%Y-%m-%d"),
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
@@ -374,7 +367,7 @@ class OverviewController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-p")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
 
@@ -408,7 +401,7 @@ class OverviewController(BaseController):
             default=10,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
 
@@ -430,7 +423,7 @@ class OverviewController(BaseController):
             """,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
 
@@ -464,7 +457,7 @@ class OverviewController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-c")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
 
@@ -545,12 +538,12 @@ class OverviewController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-c")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             pycoingecko_view.display_holdings_overview(
-                coin=ns_parser.coin,
+                symbol=ns_parser.coin,
                 export=ns_parser.export,
                 show_bar=ns_parser.bar,
                 top=ns_parser.limit,
@@ -595,7 +588,7 @@ class OverviewController(BaseController):
             default=False,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
@@ -656,7 +649,7 @@ class OverviewController(BaseController):
             default=False,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
@@ -664,7 +657,7 @@ class OverviewController(BaseController):
                 top=ns_parser.limit,
                 export=ns_parser.export,
                 sortby=ns_parser.sortby,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 pie=ns_parser.pie,
             )
 
@@ -712,13 +705,13 @@ class OverviewController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-t")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED, limit=10
         )
         if ns_parser:
             loanscan_view.display_crypto_rates(
                 rate_type=ns_parser.type,
-                cryptos=ns_parser.cryptos,
+                symbols=ns_parser.cryptos,
                 platforms=ns_parser.platforms,
                 limit=ns_parser.limit,
                 export=ns_parser.export,
@@ -774,7 +767,7 @@ class OverviewController(BaseController):
             default=False,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
@@ -782,7 +775,7 @@ class OverviewController(BaseController):
                 top=ns_parser.limit,
                 export=ns_parser.export,
                 sortby=ns_parser.sortby,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 links=ns_parser.urls,
             )
 
@@ -826,14 +819,14 @@ class OverviewController(BaseController):
             default=True,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             pycoingecko_view.display_exchange_rates(
                 sortby=ns_parser.sortby,
                 top=ns_parser.limit,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 export=ns_parser.export,
             )
 
@@ -881,14 +874,14 @@ class OverviewController(BaseController):
             default=True,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             pycoingecko_view.display_indexes(
                 top=ns_parser.limit,
                 sortby=ns_parser.sortby,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 export=ns_parser.export,
             )
 
@@ -938,14 +931,14 @@ class OverviewController(BaseController):
             default=True,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             pycoingecko_view.display_derivatives(
                 top=ns_parser.limit,
                 sortby=ns_parser.sortby,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 export=ns_parser.export,
             )
 
@@ -967,7 +960,7 @@ class OverviewController(BaseController):
             default=False,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
@@ -989,7 +982,7 @@ class OverviewController(BaseController):
                    Market Cap, Trading Volume, Defi Dominance, Top Coins...""",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
@@ -1007,7 +1000,7 @@ class OverviewController(BaseController):
             Number of cryptocurrencies, All Time High, All Time Low""",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
@@ -1066,14 +1059,14 @@ class OverviewController(BaseController):
             default=True,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             coinpaprika_view.display_all_coins_market_info(
-                currency=ns_parser.vs,
+                symbol=ns_parser.vs,
                 top=ns_parser.limit,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 export=ns_parser.export,
                 sortby=ns_parser.sortby,
             )
@@ -1144,7 +1137,7 @@ class OverviewController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-e")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
@@ -1153,7 +1146,7 @@ class OverviewController(BaseController):
                 top=ns_parser.limit,
                 export=ns_parser.export,
                 sortby=ns_parser.sortby,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 links=ns_parser.urls,
             )
 
@@ -1166,8 +1159,10 @@ class OverviewController(BaseController):
             prog="cpinfo",
             description="""Show basic coin information for all coins from CoinPaprika API
                 You can display only N number of coins with --limit parameter.
-                You can sort data by rank, name, symbol, price, volume_24h, circulating_supply, total_supply, max_supply,
-                market_cap, beta_value, ath_price --sort parameter and also with --descend flag to sort descending.
+                You can sort data by rank, name, symbol, price, volume_24h, circulating_supply,
+                total_supply, max_supply, market_cap, beta_value, ath_price --sort parameter
+                and also with --descend flag to sort descending.
+
                 Displays:
                     rank, name, symbol, price, volume_24h, circulating_supply,
                     total_supply, max_supply, market_cap, beta_value, ath_price
@@ -1210,14 +1205,14 @@ class OverviewController(BaseController):
             default=True,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             coinpaprika_view.display_all_coins_info(
-                currency=ns_parser.vs,
+                symbol=ns_parser.vs,
                 top=ns_parser.limit,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 sortby=ns_parser.sortby,
                 export=ns_parser.export,
             )
@@ -1275,14 +1270,14 @@ class OverviewController(BaseController):
             default=True,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             coinpaprika_view.display_all_exchanges(
-                currency=ns_parser.vs,
+                symbol=ns_parser.vs,
                 top=ns_parser.limit,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 sortby=ns_parser.sortby,
                 export=ns_parser.export,
             )
@@ -1297,7 +1292,7 @@ class OverviewController(BaseController):
             description="""List all smart contract platforms like ethereum, solana, cosmos, polkadot, kusama""",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
@@ -1363,14 +1358,14 @@ class OverviewController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-p")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             coinpaprika_view.display_contracts(
-                platform=ns_parser.platform,
+                symbol=ns_parser.platform,
                 top=ns_parser.limit,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 sortby=ns_parser.sortby,
                 export=ns_parser.export,
             )
@@ -1412,7 +1407,7 @@ class OverviewController(BaseController):
             default=True,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
@@ -1420,7 +1415,7 @@ class OverviewController(BaseController):
                 top=ns_parser.limit,
                 export=ns_parser.export,
                 sortby=ns_parser.sortby,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
             )
 
     @log_start_end(log=logger)
@@ -1453,7 +1448,6 @@ class OverviewController(BaseController):
         )
 
         parser.add_argument(
-            "-f",
             "--filter",
             dest="filter",
             type=str,
@@ -1497,11 +1491,11 @@ class OverviewController(BaseController):
             "--urls",
             dest="urls",
             action="store_true",
-            help="Flag to show urls. If you will use that flag you will additional column with urls",
+            help="Flag to show urls column.",
             default=False,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
 
@@ -1510,7 +1504,7 @@ class OverviewController(BaseController):
                 top=ns_parser.limit,
                 export=ns_parser.export,
                 sortby=ns_parser.sortby,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 links=ns_parser.urls,
                 post_kind=ns_parser.kind,
                 filter_=ns_parser.filter,

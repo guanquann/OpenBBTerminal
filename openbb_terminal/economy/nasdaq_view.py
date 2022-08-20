@@ -6,7 +6,6 @@ import os
 from typing import List, Optional
 
 import matplotlib.pyplot as plt
-import pandas as pd
 
 from openbb_terminal.decorators import check_api_key
 from openbb_terminal.config_terminal import theme
@@ -17,6 +16,7 @@ from openbb_terminal.helper_funcs import (
     export_data,
     plot_autoscale,
     print_rich_table,
+    is_valid_axes_count,
 )
 from openbb_terminal.rich_config import console
 
@@ -42,28 +42,17 @@ def display_big_mac_index(
     export : str, optional
         Format data, by default ""
     external_axes : Optional[List[plt.Axes]], optional
-        External axes (3 axes are expected in the list), by default None
+        External axes (1 axis is expected in the list), by default None
     """
-    df_cols = ["Date"]
-    df_cols.extend(country_codes)
-    big_mac = pd.DataFrame(columns=df_cols)
-    for country in country_codes:
-        df1 = nasdaq_model.get_big_mac_index(country)
-        if not df1.empty:
-            big_mac[country] = df1["dollar_price"]
-            big_mac["Date"] = df1["Date"]
-    big_mac.set_index("Date", inplace=True)
+    big_mac = nasdaq_model.get_big_mac_indices(country_codes)
 
     if not big_mac.empty:
         if external_axes is None:
             _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
-
-        else:
-            if len(external_axes) != 3:
-                logger.error("Expected list of 3 axis items.")
-                console.print("[red]Expected list of 3 axis items./n[/red]")
-                return
+        elif is_valid_axes_count(external_axes, 1):
             (ax,) = external_axes
+        else:
+            return
 
         big_mac.plot(ax=ax, marker="o")
         ax.legend()
@@ -80,7 +69,6 @@ def display_big_mac_index(
                 title="Big Mac Index",
                 show_index=True,
             )
-            console.print("")
 
         export_data(
             export, os.path.dirname(os.path.abspath(__file__)), "bigmac", big_mac

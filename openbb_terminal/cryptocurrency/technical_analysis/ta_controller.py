@@ -4,6 +4,7 @@ __docformat__ = "numpy"
 
 import argparse
 import logging
+import webbrowser
 from datetime import datetime
 from typing import List
 
@@ -14,8 +15,10 @@ from openbb_terminal import feature_flags as obbff
 from openbb_terminal.common.technical_analysis import (
     custom_indicators_view,
     momentum_view,
+    overlap_model,
     overlap_view,
     trend_indicators_view,
+    volatility_model,
     volatility_view,
     volume_view,
 )
@@ -24,12 +27,12 @@ from openbb_terminal.helper_funcs import (
     EXPORT_BOTH_RAW_DATA_AND_FIGURES,
     check_positive,
     check_positive_list,
-    parse_known_args_and_warn,
+    check_positive_float,
     valid_date,
 )
 from openbb_terminal.menu import session
 from openbb_terminal.parent_classes import CryptoBaseController
-from openbb_terminal.rich_config import console
+from openbb_terminal.rich_config import console, MenuText
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +44,8 @@ class TechnicalAnalysisController(CryptoBaseController):
         "load",
         "ema",
         "sma",
+        "wma",
+        "hma",
         "vwap",
         "zlma",
         "cci",
@@ -53,9 +58,12 @@ class TechnicalAnalysisController(CryptoBaseController):
         "aroon",
         "bbands",
         "donchian",
+        "kc",
         "ad",
+        "adosc",
         "obv",
         "fib",
+        "tv",
     ]
 
     PATH = "/crypto/ta/"
@@ -79,42 +87,48 @@ class TechnicalAnalysisController(CryptoBaseController):
 
         if session and obbff.USE_PROMPT_TOOLKIT:
             choices: dict = {c: {} for c in self.controller_choices}
+
+            choices["support"] = self.SUPPORT_CHOICES
+            choices["about"] = self.ABOUT_CHOICES
+
             self.completer = NestedCompleter.from_nested_dict(choices)
 
     def print_help(self):
         """Print help"""
         crypto_str = f" {self.coin} (from {self.start.strftime('%Y-%m-%d')})"
-        help_text = f"""[cmds]
-[param]Coin Loaded: [/param]{crypto_str}
-
-[info]Overlap:[/info]
-    ema         exponential moving average
-    sma         simple moving average
-    wma         weighted moving average
-    zlma        zero lag moving average
-    vwap        volume weighted average price
-[info]Momentum:[/info]
-    cci         commodity channel index
-    macd        moving average convergence/divergence
-    rsi         relative strength index
-    stoch       stochastic oscillator
-    fisher      fisher transform
-    cg          centre of gravity
-[info]Trend:[/info]
-    adx         average directional movement index
-    aroon       aroon indicator
-[info]Volatility:[/info]
-    bbands      bollinger bands
-    donchian    donchian channels
-    kc          keltner channels
-[info]Volume:[/info]
-    ad          accumulation/distribution line
-    adosc       chaikin oscillator
-    obv         on balance volume
-[info]Custom:[/info]
-    fib         fibonacci retracement[/cmds]
-"""
-        console.print(text=help_text, menu="Cryptocurrency - Technical Analysis")
+        mt = MenuText("crypto/ta/", 90)
+        mt.add_param("_ticker", crypto_str)
+        mt.add_raw("\n")
+        mt.add_cmd("tv", "TradingView")
+        mt.add_raw("\n")
+        mt.add_info("_overlap_")
+        mt.add_cmd("ema")
+        mt.add_cmd("sma")
+        mt.add_cmd("wma")
+        mt.add_cmd("hma")
+        mt.add_cmd("zlma")
+        mt.add_cmd("vwap")
+        mt.add_info("_momentum_")
+        mt.add_cmd("cci")
+        mt.add_cmd("macd")
+        mt.add_cmd("rsi")
+        mt.add_cmd("stoch")
+        mt.add_cmd("fisher")
+        mt.add_cmd("cg")
+        mt.add_info("_trend_")
+        mt.add_cmd("adx")
+        mt.add_cmd("aroon")
+        mt.add_info("_volatility_")
+        mt.add_cmd("bbands")
+        mt.add_cmd("donchian")
+        mt.add_cmd("kc")
+        mt.add_info("_volume_")
+        mt.add_cmd("ad")
+        mt.add_cmd("adosc")
+        mt.add_cmd("obv")
+        mt.add_info("_custom_")
+        mt.add_cmd("fib")
+        console.print(text=mt.menu_text, menu="Cryptocurrency - Technical Analysis")
 
     def custom_reset(self):
         """Class specific component of reset command"""
@@ -122,6 +136,24 @@ class TechnicalAnalysisController(CryptoBaseController):
             return ["crypto", f"load {self.coin}", "ta"]
         return []
 
+    @log_start_end(log=logger)
+    def call_tv(self, other_args):
+        """Process tv command"""
+        parser = argparse.ArgumentParser(
+            add_help=False,
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            prog="tv",
+            description="""View TradingView for technical analysis. [Source: TradingView]""",
+        )
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
+        if ns_parser:
+            # temp USDT before we make changes to crypto ta_controller
+            webbrowser.open(
+                f"https://www.tradingview.com/chart/?symbol={self.coin}usdt"
+            )
+            console.print("")
+
+    # COMMON
     # TODO: Go through all models and make sure all needed columns are in dfs
 
     @log_start_end(log=logger)
@@ -142,17 +174,15 @@ class TechnicalAnalysisController(CryptoBaseController):
             in the data.
         """,
         )
-
         parser.add_argument(
             "-l",
             "--length",
             action="store",
             dest="n_length",
             type=check_positive_list,
-            default=[20, 50],
+            default=overlap_model.WINDOW_LENGTHS,
             help="Window lengths.  Multiple values indicated as comma separated values.",
         )
-
         parser.add_argument(
             "-o",
             "--offset",
@@ -166,15 +196,15 @@ class TechnicalAnalysisController(CryptoBaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             overlap_view.view_ma(
                 ma_type="EMA",
-                s_ticker=self.coin,
-                series=self.stock["Close"],
-                length=ns_parser.n_length,
+                symbol=self.coin,
+                series=self.stock["Adj Close"],
+                window=ns_parser.n_length,
                 offset=ns_parser.n_offset,
                 export=ns_parser.export,
             )
@@ -196,17 +226,15 @@ class TechnicalAnalysisController(CryptoBaseController):
                 filtering out those changes.
             """,
         )
-
         parser.add_argument(
             "-l",
             "--length",
             action="store",
             dest="n_length",
             type=check_positive_list,
-            default=[20, 50],
+            default=overlap_model.WINDOW_LENGTHS,
             help="Window lengths.  Multiple values indicated as comma separated values. ",
         )
-
         parser.add_argument(
             "-o",
             "--offset",
@@ -219,15 +247,114 @@ class TechnicalAnalysisController(CryptoBaseController):
 
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
-        ns_parser = parse_known_args_and_warn(
+
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             overlap_view.view_ma(
                 ma_type="SMA",
-                s_ticker=self.coin,
-                series=self.stock["Close"],
-                length=ns_parser.n_length,
+                symbol=self.coin,
+                series=self.stock["Adj Close"],
+                window=ns_parser.n_length,
+                offset=ns_parser.n_offset,
+                export=ns_parser.export,
+            )
+
+    @log_start_end(log=logger)
+    def call_wma(self, other_args: List[str]):
+        """Process wma command"""
+        parser = argparse.ArgumentParser(
+            add_help=False,
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            prog="wma",
+            description="""
+                A Weighted Moving Average puts more weight on recent data and less on past data.
+                This is done by multiplying each bar’s price by a weighting factor. Because of its
+                unique calculation, WMA will follow prices more closely than a corresponding Simple
+                Moving Average.
+                        """,
+        )
+        parser.add_argument(
+            "-l",
+            "--length",
+            action="store",
+            dest="n_length",
+            type=check_positive_list,
+            default=overlap_model.WINDOW_LENGTHS,
+            help="Window lengths.  Multiple values indicated as comma separated values. ",
+        )
+        parser.add_argument(
+            "-o",
+            "--offset",
+            action="store",
+            dest="n_offset",
+            type=int,
+            default=0,
+            help="offset",
+        )
+
+        if other_args and "-" not in other_args[0][0]:
+            other_args.insert(0, "-l")
+
+        ns_parser = self.parse_known_args_and_warn(
+            parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
+        )
+        if ns_parser:
+            overlap_view.view_ma(
+                ma_type="WMA",
+                symbol=self.coin,
+                series=self.stock["Adj Close"],
+                window=ns_parser.n_length,
+                offset=ns_parser.n_offset,
+                export=ns_parser.export,
+            )
+
+    @log_start_end(log=logger)
+    def call_hma(self, other_args: List[str]):
+        """Process hma command"""
+        parser = argparse.ArgumentParser(
+            add_help=False,
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            prog="hma",
+            description="""
+                The Hull Moving Average solves the age old dilemma of making a moving average
+                more responsive to current price activity whilst maintaining curve smoothness.
+                In fact the HMA almost eliminates lag altogether and manages to improve smoothing
+                at the same time.
+                        """,
+        )
+        parser.add_argument(
+            "-l",
+            "--length",
+            action="store",
+            dest="n_length",
+            type=check_positive_list,
+            default=overlap_model.WINDOW_LENGTHS2,
+            help="Window lengths.  Multiple values indicated as comma separated values. ",
+        )
+        parser.add_argument(
+            "-o",
+            "--offset",
+            action="store",
+            dest="n_offset",
+            type=int,
+            default=0,
+            help="offset",
+        )
+
+        if other_args and "-" not in other_args[0][0]:
+            other_args.insert(0, "-l")
+
+        ns_parser = self.parse_known_args_and_warn(
+            parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
+        )
+        if ns_parser:
+            overlap_view.view_ma(
+                ma_type="HMA",
+                symbol=self.coin,
+                series=self.stock["Adj Close"],
+                window=ns_parser.n_length,
                 offset=ns_parser.n_offset,
                 export=ns_parser.export,
             )
@@ -249,7 +376,6 @@ class TechnicalAnalysisController(CryptoBaseController):
                 the moving average.
             """,
         )
-
         parser.add_argument(
             "-l",
             "--length",
@@ -259,7 +385,6 @@ class TechnicalAnalysisController(CryptoBaseController):
             default=[20],
             help="Window lengths.  Multiple values indicated as comma separated values.",
         )
-
         parser.add_argument(
             "-o",
             "--offset",
@@ -273,15 +398,15 @@ class TechnicalAnalysisController(CryptoBaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             overlap_view.view_ma(
                 ma_type="ZLMA",
-                s_ticker=self.coin,
-                series=self.stock["Close"],
-                length=ns_parser.n_length,
+                symbol=self.coin,
+                series=self.stock["Adj Close"],
+                window=ns_parser.n_length,
                 offset=ns_parser.n_offset,
                 export=ns_parser.export,
             )
@@ -298,7 +423,6 @@ class TechnicalAnalysisController(CryptoBaseController):
                 by volume.  It is typically used with intraday charts to identify general direction.
             """,
         )
-
         parser.add_argument(
             "-o",
             "--offset",
@@ -308,18 +432,42 @@ class TechnicalAnalysisController(CryptoBaseController):
             default=0,
             help="offset",
         )
+        parser.add_argument(
+            "--start",
+            dest="start",
+            type=valid_date,
+            help="Starting date to select",
+            required="--end" in other_args,
+        )
+        parser.add_argument(
+            "--end",
+            dest="end",
+            type=valid_date,
+            help="Ending date to select",
+            required="--start" in other_args,
+        )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
+            # Daily
             if self.interval == "1440min":
-                console.print("VWAP should be used with intraday data.\n")
+                if not ns_parser.start:
+                    console.print(
+                        "If no date conditions, VWAP should be used with intraday data. \n"
+                    )
+                    return
+                interval_text = "Daily"
+            else:
+                interval_text = self.interval
 
             overlap_view.view_vwap(
-                s_ticker=self.coin,
-                s_interval=self.interval,
-                ohlc=self.stock,
+                symbol=self.coin,
+                s_interval=interval_text,
+                data=self.stock,
+                start_date=ns_parser.start,
+                end_date=ns_parser.end,
                 offset=ns_parser.n_offset,
                 export=ns_parser.export,
             )
@@ -360,14 +508,14 @@ class TechnicalAnalysisController(CryptoBaseController):
             help="scalar",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             momentum_view.display_cci(
-                s_ticker=self.coin,
-                ohlc=self.stock,
-                length=ns_parser.n_length,
+                symbol=self.coin,
+                data=self.stock,
+                window=ns_parser.n_length,
                 scalar=ns_parser.n_scalar,
                 export=ns_parser.export,
             )
@@ -392,7 +540,6 @@ class TechnicalAnalysisController(CryptoBaseController):
             """,
         )
         parser.add_argument(
-            "-f",
             "--fast",
             action="store",
             dest="n_fast",
@@ -401,7 +548,6 @@ class TechnicalAnalysisController(CryptoBaseController):
             help="The short period.",
         )
         parser.add_argument(
-            "-s",
             "--slow",
             action="store",
             dest="n_slow",
@@ -418,12 +564,12 @@ class TechnicalAnalysisController(CryptoBaseController):
             help="The signal period.",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             momentum_view.display_macd(
-                s_ticker=self.coin,
+                symbol=self.coin,
                 series=self.stock["Adj Close"],
                 n_fast=ns_parser.n_fast,
                 n_slow=ns_parser.n_slow,
@@ -478,14 +624,14 @@ class TechnicalAnalysisController(CryptoBaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             momentum_view.display_rsi(
-                s_ticker=self.coin,
+                symbol=self.coin,
                 series=self.stock["Adj Close"],
-                length=ns_parser.n_length,
+                window=ns_parser.n_length,
                 scalar=ns_parser.n_scalar,
                 drift=ns_parser.n_drift,
                 export=ns_parser.export,
@@ -534,13 +680,13 @@ class TechnicalAnalysisController(CryptoBaseController):
             help="The time period of the slowk moving average",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             momentum_view.display_stoch(
-                s_ticker=self.coin,
-                ohlc=self.stock,
+                symbol=self.coin,
+                data=self.stock,
                 fastkperiod=ns_parser.n_fastkperiod,
                 slowdperiod=ns_parser.n_slowdperiod,
                 slowkperiod=ns_parser.n_slowkperiod,
@@ -575,14 +721,14 @@ class TechnicalAnalysisController(CryptoBaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             momentum_view.display_fisher(
-                s_ticker=self.coin,
-                ohlc=self.stock,
-                length=ns_parser.n_length,
+                symbol=self.coin,
+                data=self.stock,
+                window=ns_parser.n_length,
                 export=ns_parser.export,
             )
 
@@ -614,14 +760,14 @@ class TechnicalAnalysisController(CryptoBaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             momentum_view.display_cg(
-                s_ticker=self.coin,
+                symbol=self.coin,
                 series=self.stock["Adj Close"],
-                length=ns_parser.n_length,
+                window=ns_parser.n_length,
                 export=ns_parser.export,
             )
 
@@ -638,7 +784,6 @@ class TechnicalAnalysisController(CryptoBaseController):
             a high number to be a strong trend, and a low number, a weak trend.
         """,
         )
-
         parser.add_argument(
             "-l",
             "--length",
@@ -648,7 +793,6 @@ class TechnicalAnalysisController(CryptoBaseController):
             default=14,
             help="length",
         )
-
         parser.add_argument(
             "-s",
             "--scalar",
@@ -658,7 +802,6 @@ class TechnicalAnalysisController(CryptoBaseController):
             default=100,
             help="scalar",
         )
-
         parser.add_argument(
             "-d",
             "--drift",
@@ -669,14 +812,17 @@ class TechnicalAnalysisController(CryptoBaseController):
             help="drift",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        if other_args and "-" not in other_args[0][0]:
+            other_args.insert(0, "-l")
+
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             trend_indicators_view.display_adx(
-                s_ticker=self.coin,
-                ohlc=self.stock,
-                length=ns_parser.n_length,
+                symbol=self.coin,
+                data=self.stock,
+                window=ns_parser.n_length,
                 scalar=ns_parser.n_scalar,
                 drift=ns_parser.n_drift,
                 export=ns_parser.export,
@@ -712,7 +858,6 @@ class TechnicalAnalysisController(CryptoBaseController):
             default=25,
             help="length",
         )
-
         parser.add_argument(
             "-s",
             "--scalar",
@@ -723,24 +868,17 @@ class TechnicalAnalysisController(CryptoBaseController):
             help="scalar",
         )
 
-        parser.add_argument(
-            "-o",
-            "--offset",
-            action="store",
-            dest="n_offset",
-            type=check_positive,
-            default=0,
-            help="offset",
-        )
+        if other_args and "-" not in other_args[0][0]:
+            other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             trend_indicators_view.display_aroon(
-                s_ticker=self.coin,
-                ohlc=self.stock,
-                length=ns_parser.n_length,
+                symbol=self.coin,
+                data=self.stock,
+                window=ns_parser.n_length,
                 scalar=ns_parser.n_scalar,
                 export=ns_parser.export,
             )
@@ -772,20 +910,18 @@ class TechnicalAnalysisController(CryptoBaseController):
             action="store",
             dest="n_length",
             type=check_positive,
-            default=5,
+            default=15,
             help="length",
         )
-
         parser.add_argument(
             "-s",
             "--std",
             action="store",
             dest="n_std",
-            type=check_positive,
+            type=check_positive_float,
             default=2,
             help="std",
         )
-
         parser.add_argument(
             "-m",
             "--mamode",
@@ -795,14 +931,17 @@ class TechnicalAnalysisController(CryptoBaseController):
             help="mamode",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        if other_args and "-" not in other_args[0][0]:
+            other_args.insert(0, "-l")
+
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             volatility_view.display_bbands(
-                ticker=self.coin,
-                ohlc=self.stock,
-                length=ns_parser.n_length,
+                symbol=self.coin,
+                data=self.stock,
+                window=ns_parser.n_length,
                 n_std=ns_parser.n_std,
                 mamode=ns_parser.s_mamode,
                 export=ns_parser.export,
@@ -824,7 +963,6 @@ class TechnicalAnalysisController(CryptoBaseController):
                 between the upper and lower bands represents the Donchian Channel.
                 """,
         )
-
         parser.add_argument(
             "-u",
             "--length_upper",
@@ -834,7 +972,6 @@ class TechnicalAnalysisController(CryptoBaseController):
             default=20,
             help="length",
         )
-
         parser.add_argument(
             "-l",
             "--length_lower",
@@ -845,15 +982,84 @@ class TechnicalAnalysisController(CryptoBaseController):
             help="length",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             volatility_view.display_donchian(
-                ticker=self.coin,
-                ohlc=self.stock,
+                symbol=self.coin,
+                data=self.stock,
                 upper_length=ns_parser.n_length_upper,
                 lower_length=ns_parser.n_length_lower,
+                export=ns_parser.export,
+            )
+
+    @log_start_end(log=logger)
+    def call_kc(self, other_args: List[str]):
+        """Process kc command"""
+        parser = argparse.ArgumentParser(
+            add_help=False,
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            prog="kc",
+            description="""
+                 Keltner Channels are volatility-based bands that are placed
+                 on either side of an asset's price and can aid in determining
+                 the direction of a trend.The Keltner channel uses the average
+                 true range (ATR) or volatility, with breaks above or below the top
+                 and bottom barriers signaling a continuation.
+            """,
+        )
+        parser.add_argument(
+            "-l",
+            "--length",
+            action="store",
+            dest="n_length",
+            type=check_positive,
+            default=20,
+            help="Window length",
+        )
+        parser.add_argument(
+            "-s",
+            "--scalar",
+            action="store",
+            dest="n_scalar",
+            type=check_positive,
+            default=2,
+            help="scalar",
+        )
+        parser.add_argument(
+            "-m",
+            "--mamode",
+            action="store",
+            dest="s_mamode",
+            default="ema",
+            choices=volatility_model.MAMODES,
+            help="mamode",
+        )
+        parser.add_argument(
+            "-o",
+            "--offset",
+            action="store",
+            dest="n_offset",
+            type=int,
+            default=0,
+            help="offset",
+        )
+
+        if other_args and "-" not in other_args[0][0]:
+            other_args.insert(0, "-l")
+
+        ns_parser = self.parse_known_args_and_warn(
+            parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
+        )
+        if ns_parser:
+            volatility_view.view_kc(
+                symbol=self.coin,
+                data=self.stock,
+                window=ns_parser.n_length,
+                scalar=ns_parser.n_scalar,
+                mamode=ns_parser.s_mamode,
+                offset=ns_parser.n_offset,
                 export=ns_parser.export,
             )
 
@@ -877,7 +1083,6 @@ class TechnicalAnalysisController(CryptoBaseController):
                 then it signals an impending flattening of the price.
             """,
         )
-
         parser.add_argument(
             "--open",
             action="store_true",
@@ -886,14 +1091,68 @@ class TechnicalAnalysisController(CryptoBaseController):
             help="uses open value of stock",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             volume_view.display_ad(
-                s_ticker=self.coin,
-                ohlc=self.stock,
+                symbol=self.coin,
+                data=self.stock,
                 use_open=ns_parser.b_use_open,
+                export=ns_parser.export,
+            )
+
+    @log_start_end(log=logger)
+    def call_adosc(self, other_args: List[str]):
+        """Process adosc command"""
+        parser = argparse.ArgumentParser(
+            add_help=False,
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            prog="adosc",
+            description="""
+                 Accumulation/Distribution Oscillator, also known as the Chaikin Oscillator
+                 is essentially a momentum indicator, but of the Accumulation-Distribution line
+                 rather than merely price. It looks at both the strength of price moves and the
+                 underlying buying and selling pressure during a given time period. The oscillator
+                 reading above zero indicates net buying pressure, while one below zero registers
+                 net selling pressure. Divergence between the indicator and pure price moves are
+                 the most common signals from the indicator, and often flag market turning points.
+            """,
+        )
+        parser.add_argument(
+            "--open",
+            action="store_true",
+            default=False,
+            dest="b_use_open",
+            help="uses open value of stock",
+        )
+        parser.add_argument(
+            "--fast",
+            action="store",
+            dest="n_length_fast",
+            type=check_positive,
+            default=3,
+            help="fast length",
+        )
+        parser.add_argument(
+            "--slow",
+            action="store",
+            dest="n_length_slow",
+            type=check_positive,
+            default=10,
+            help="slow length",
+        )
+
+        ns_parser = self.parse_known_args_and_warn(
+            parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
+        )
+        if ns_parser:
+            volume_view.display_adosc(
+                symbol=self.coin,
+                data=self.stock,
+                use_open=ns_parser.b_use_open,
+                fast=ns_parser.n_length_fast,
+                slow=ns_parser.n_length_slow,
                 export=ns_parser.export,
             )
 
@@ -915,13 +1174,13 @@ class TechnicalAnalysisController(CryptoBaseController):
             """,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             volume_view.display_obv(
-                s_ticker=self.coin,
-                ohlc=self.stock,
+                symbol=self.coin,
+                data=self.stock,
                 export=ns_parser.export,
             )
 
@@ -934,16 +1193,14 @@ class TechnicalAnalysisController(CryptoBaseController):
             prog="fib",
             description="Calculates the fibonacci retracement levels",
         )
-
         parser.add_argument(
             "-p",
             "--period",
             dest="period",
             type=int,
-            help="Days to lookback for retracement",
+            help="Days to look back for retracement",
             default=120,
         )
-
         parser.add_argument(
             "--start",
             dest="start",
@@ -951,7 +1208,6 @@ class TechnicalAnalysisController(CryptoBaseController):
             help="Starting date to select",
             required="--end" in other_args,
         )
-
         parser.add_argument(
             "--end",
             dest="end",
@@ -960,13 +1216,16 @@ class TechnicalAnalysisController(CryptoBaseController):
             required="--start" in other_args,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        if other_args and "-" not in other_args[0][0]:
+            other_args.insert(0, "-p")
+
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             custom_indicators_view.fibonacci_retracement(
-                s_ticker=self.coin,
-                ohlc=self.stock,
+                symbol=self.coin,
+                data=self.stock,
                 period=ns_parser.period,
                 start_date=ns_parser.start,
                 end_date=ns_parser.end,

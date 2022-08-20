@@ -3,7 +3,6 @@ __docformat__ = "numpy"
 
 import logging
 import os
-import re
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Union
@@ -20,6 +19,7 @@ from sklearn.linear_model import LinearRegression
 
 from openbb_terminal.decorators import log_start_end
 from openbb_terminal.stocks.fundamental_analysis import dcf_static
+from openbb_terminal.helper_funcs import compose_export_path
 
 logger = logging.getLogger(__name__)
 
@@ -245,8 +245,8 @@ def get_fama_raw() -> pd.DataFrame:
     df : pd.DataFrame
         Fama French data
     """
-    with urlopen(
-        "http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_CSV.zip"
+    with urlopen(  # nosec
+        "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_CSV.zip"
     ) as url:
 
         # Download Zipfile and create pandas DataFrame
@@ -275,20 +275,20 @@ def get_fama_raw() -> pd.DataFrame:
 
 
 @log_start_end(log=logger)
-def get_historical_5(ticker: str) -> pd.DataFrame:
+def get_historical_5(symbol: str) -> pd.DataFrame:
     """Get 5 year monthly historical performance for a ticker with dividends filtered
 
     Parameters
     ----------
-    ticker : str
-        The ticker to be analyzed
+    symbol: str
+        The ticker symbol to be analyzed
 
     Returns
     -------
-    df : pd.DataFrame
+    df: pd.DataFrame
         Historical data
     """
-    tick = yf.Ticker(ticker)
+    tick = yf.Ticker(symbol)
     df = tick.history(period="5y", interval="1mo")
     df = df[df.index.to_series().apply(lambda x: x.day == 1)]
     df = df.drop(["Dividends", "Stock Splits"], axis=1)
@@ -297,13 +297,13 @@ def get_historical_5(ticker: str) -> pd.DataFrame:
 
 
 @log_start_end(log=logger)
-def get_fama_coe(ticker: str) -> float:
+def get_fama_coe(symbol: str) -> float:
     """Use Fama and French to get the cost of equity for a company
 
     Parameters
     ----------
-    ticker : str
-        The ticker to be analyzed
+    symbol : str
+        The ticker symbol to be analyzed
 
     Returns
     -------
@@ -311,7 +311,7 @@ def get_fama_coe(ticker: str) -> float:
         The stock's Fama French coefficient
     """
     df_f = get_fama_raw()
-    df_h = get_historical_5(ticker)
+    df_h = get_historical_5(symbol)
     df = df_h.join(df_f)
     df = df.dropna()
     df["Monthly Return"] = df["Close"].pct_change()
@@ -332,25 +332,25 @@ def get_fama_coe(ticker: str) -> float:
 
 @log_start_end(log=logger)
 def others_in_sector(
-    ticker: str, sector: str, industry: str, no_filter: bool = False
+    symbol: str, sector: str, industry: str, no_filter: bool = False
 ) -> List[str]:
     """Get other stocks in a ticker's sector
 
     Parameters
     ----------
-    ticker : str
-        The ticker to be excluded
-    sector : str
+    symbol: str
+        The ticker symbol to be excluded
+    sector: str
         The sector to pull from
-    industry : str
+    industry: str
         The industry to pull from
-    no_filter : bool
+    no_filter: bool
         True means that we do not filter based on market cap
 
     Returns
     -------
-    tickers : List[str]
-        List of tickers in the same sector
+    List[str]
+        List of symbols in the same sector
     """
     industry = industry.replace("—", " - ")
     industry = industry.replace("/", " ")
@@ -358,9 +358,9 @@ def others_in_sector(
     similars = fd.select_equities(sector=sector, industry=industry)
 
     # This filters similars to match market cap and removes ticker analyzed
-    if ticker in similars:
-        market_cap = similars[ticker]["market_cap"]
-        similars.pop(ticker, None)
+    if symbol in similars:
+        market_cap = similars[symbol]["market_cap"]
+        similars.pop(symbol, None)
         if not no_filter:
             similars = {
                 k: v for (k, v) in similars.items() if v["market_cap"] == market_cap
@@ -369,14 +369,14 @@ def others_in_sector(
     return similars
 
 
-def create_dataframe(ticker: str, statement: str, period: str = "annual"):
+def create_dataframe(symbol: str, statement: str, period: str = "annual"):
     """
     Creates a df financial statement for a given ticker
 
     Parameters
     ----------
-    ticker : str
-        The ticker to create a dataframe for
+    symbol : str
+        The ticker symbol to create a dataframe for
     statement : str
         The financial statement dataframe to create
     period : str
@@ -392,14 +392,14 @@ def create_dataframe(ticker: str, statement: str, period: str = "annual"):
         The currency the financial statements are reported in
     """
     if statement not in ["BS", "CF", "IS"]:
-        raise ValueError("statement variable must be 'BS','CF', or 'IS'")
+        raise ValueError("statement variable must be 'BS', 'CF' or 'IS'")
     if period not in ["annual", "quarterly", "trailing"]:
         raise ValueError(
             "statement variable must be 'annual','quarterly', or 'trailing'"
         )
     per_url = f"{period}/" if period != "annual" else ""
 
-    URL = f"https://stockanalysis.com/stocks/{ticker}/financials/"
+    URL = f"https://stockanalysis.com/stocks/{symbol}/financials/"
     URL += dcf_static.statement_url[statement] + per_url
     ignores = dcf_static.statement_ignore[statement]
 
@@ -407,22 +407,14 @@ def create_dataframe(ticker: str, statement: str, period: str = "annual"):
 
     if "404 - Page Not Found" in r.text:
         return pd.DataFrame(), None, None
+
+    try:
+        df = pd.read_html(r.text)[0]
+    except ValueError:
+        return pd.DataFrame(), None, None
+
     soup = BeautifulSoup(r.content, "html.parser")
-
-    table = soup.find("table", attrs={"class": re.compile("fintbl")})
-    if table is None:
-        return pd.DataFrame(), None, None
-    head = table.find("thead")
-    if head is None:
-        return pd.DataFrame(), None, None
-    columns = head.find_all("th")
-    if columns is None:
-        return pd.DataFrame(), None, None
-
-    years = [x.get_text().strip() for x in columns]
-    len_data = len(years) - 1
-
-    phrase = soup.find("div", attrs={"class": "block text-sm text-gray-600 lg:hidden"})
+    phrase = soup.find("div", attrs={"class": "info-long svelte-f7kao3"})
     phrase = phrase.get_text().lower() if phrase else ""
 
     if "thousand" in phrase:
@@ -439,23 +431,12 @@ def create_dataframe(ticker: str, statement: str, period: str = "annual"):
             statement_currency = currency
             break
 
-    body = table.find("tbody")
-    rows = body.find_all("tr")
-
-    all_data = [
-        [
-            x.get_text().strip() if x.get_text().strip() != "-" else "0"
-            for x in y.find_all("td")
-        ]
-        for y in rows
-    ]
-
-    df = pd.DataFrame(data=all_data)
-    df = df.set_index(0)
-    n = df.shape[1] - len_data
-    if n > 0:
-        df = df.iloc[:, :-n]
-    df.columns = years[1 : len(df.columns) + 1]
+    if "Quarter Ended" in df.columns:
+        df = df.set_index("Quarter Ended")
+    elif "Quarter Ending" in df.columns:
+        df = df.set_index("Quarter Ending")
+    else:
+        df = df.set_index("Year")
     df = df.loc[:, ~(df == "Upgrade").any()]
 
     for ignore in ignores:
@@ -481,14 +462,14 @@ def create_dataframe(ticker: str, statement: str, period: str = "annual"):
 
 
 @log_start_end(log=logger)
-def get_similar_dfs(ticker: str, info: Dict[str, Any], n: int, no_filter: bool = False):
+def get_similar_dfs(symbol: str, info: Dict[str, Any], n: int, no_filter: bool = False):
     """
     Get dataframes for similar companies
 
     Parameters
     ----------
-    ticker : str
-        The ticker to create a dataframe for
+    symbol : str
+        The ticker symbol to create a dataframe for
     into : Dict[str,Any]
         The dictionary produced from the yfinance.info function
     n : int
@@ -501,7 +482,7 @@ def get_similar_dfs(ticker: str, info: Dict[str, Any], n: int, no_filter: bool =
     new_list : List[str, pd.DataFrame]
         A list of similar companies
     """
-    similars = others_in_sector(ticker, info["sector"], info["industry"], no_filter)
+    similars = others_in_sector(symbol, info["sector"], info["industry"], no_filter)
     i = 0
     new_list = []
     while i < n and similars:
@@ -555,10 +536,16 @@ def get_value(df: pd.DataFrame, row: str, column: int) -> Tuple[float, float]:
     value : List[float]
         The information in float format
     """
-    val1: str = df.at[row, df.columns[column]]
-    fin_val1: float = float(val1.replace(",", "").replace("-", "-0"))
-    val2: str = df.at[row, df.columns[column + 1]]
-    fin_val2: float = float(val2.replace(",", "").replace("-", "-0"))
+    val1 = df.at[row, df.columns[column]]
+    if isinstance(val1, str):
+        fin_val1: float = float(val1.replace(",", "").replace("-", "-0"))
+    else:
+        fin_val1 = float(val1)
+    val2 = df.at[row, df.columns[column + 1]]
+    if isinstance(val2, str):
+        fin_val2: float = float(val2.replace(",", "").replace("-", "-0"))
+    else:
+        fin_val2 = float(val2)
     return fin_val1, fin_val2
 
 
@@ -583,30 +570,30 @@ def frac(num: float, denom: float) -> Union[str, float]:
 
 
 @log_start_end(log=logger)
-def generate_path(n: int, ticker: str, date: str) -> Path:
+def generate_path(n: int, symbol: str, date: str) -> Path:
     """
     Create the path to save an excel file to
 
     Parameters
     ----------
-    n : int
+    n: int
         The try number
-    ticker : str
-        The ticker to be saved
-    date : str
+    symbol: str
+        The ticker symbol to be saved
+    date: str
         The date the dcf was generated
 
     Returns
     -------
-    path : Path
+    path: Path
         The path to save a file to
     """
     val = "" if n == 0 else f"({n})"
+    export_folder, _ = compose_export_path(
+        func_name="dcf", dir_path=os.path.abspath(os.path.dirname(__file__))
+    )
     trypath = os.path.join(
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")),
-        "exports",
-        "stocks",
-        "fundamental_analysis",
-        f"{ticker} {date}{val}.xlsx",
+        export_folder,
+        f"{symbol} {date}{val}.xlsx",
     )
     return Path(trypath)

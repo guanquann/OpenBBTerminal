@@ -4,32 +4,40 @@ __docformat__ = "numpy"
 import logging
 from datetime import datetime, timedelta
 from typing import Tuple
+from urllib.request import Request, urlopen
 
+import ssl
+import numpy as np
 import pandas as pd
 import yfinance as yf
 
+from bs4 import BeautifulSoup
+
 from openbb_terminal.decorators import log_start_end
 from openbb_terminal.helper_funcs import lambda_long_number_format
+from openbb_terminal.rich_config import console
 from openbb_terminal.stocks.fundamental_analysis.fa_helper import clean_df_index
 
 logger = logging.getLogger(__name__)
+# pylint: disable=W0212
+ssl._create_default_https_context = ssl._create_unverified_context
 
 
 @log_start_end(log=logger)
-def get_info(ticker: str) -> pd.DataFrame:
-    """Gets ticker info
+def get_info(symbol: str) -> pd.DataFrame:
+    """Gets ticker symbol info
 
     Parameters
     ----------
-    ticker : str
-        Stock ticker
+    symbol: str
+        Stock ticker symbol
 
     Returns
     -------
     pd.DataFrame
         DataFrame of yfinance information
     """
-    stock = yf.Ticker(ticker)
+    stock = yf.Ticker(symbol)
     df_info = pd.DataFrame(stock.info.items(), columns=["Metric", "Value"])
     df_info = df_info.set_index("Metric")
 
@@ -60,13 +68,13 @@ def get_info(ticker: str) -> pd.DataFrame:
 
 
 @log_start_end(log=logger)
-def get_shareholders(ticker: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def get_shareholders(symbol: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Get shareholders from yahoo
 
     Parameters
     ----------
-    ticker : str
-        Stock ticker
+    symbol : str
+        Stock ticker symbol
 
     Returns
     -------
@@ -77,7 +85,7 @@ def get_shareholders(ticker: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFr
     pd.DataFrame
         Mutual Fund holders
     """
-    stock = yf.Ticker(ticker)
+    stock = yf.Ticker(symbol)
 
     # Major holders
     df_major_holders = stock.major_holders
@@ -119,20 +127,20 @@ def get_shareholders(ticker: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFr
 
 
 @log_start_end(log=logger)
-def get_sustainability(ticker) -> pd.DataFrame:
+def get_sustainability(symbol: str) -> pd.DataFrame:
     """Get sustainability metrics from yahoo
 
     Parameters
     ----------
-    ticker : [type]
-        Stock ticker
+    symbol : str
+        Stock ticker symbol
 
     Returns
     -------
     pd.DataFrame
         Dataframe of sustainability metrics
     """
-    stock = yf.Ticker(ticker)
+    stock = yf.Ticker(symbol)
     pd.set_option("display.max_colwidth", None)
 
     df_sustainability = stock.sustainability
@@ -160,20 +168,20 @@ def get_sustainability(ticker) -> pd.DataFrame:
 
 
 @log_start_end(log=logger)
-def get_calendar_earnings(ticker: str) -> pd.DataFrame:
-    """Get calendar earnings for ticker
+def get_calendar_earnings(symbol: str) -> pd.DataFrame:
+    """Get calendar earnings for ticker symbol
 
     Parameters
     ----------
-    ticker : [type]
-        Stock ticker
+    symbol: str
+        Stock ticker symbol
 
     Returns
     -------
     pd.DataFrame
         Dataframe of calendar earnings
     """
-    stock = yf.Ticker(ticker)
+    stock = yf.Ticker(symbol)
     df_calendar = stock.calendar
 
     if df_calendar.empty:
@@ -191,17 +199,38 @@ def get_calendar_earnings(ticker: str) -> pd.DataFrame:
 
 
 @log_start_end(log=logger)
-def get_website(ticker: str) -> str:
-    """Gets website of company from yfinance"""
-    stock = yf.Ticker(ticker)
+def get_website(symbol: str) -> str:
+    """Gets website of company from yfinance
+
+    Parameters
+    ----------
+    symbol: str
+        Stock ticker symbol
+
+    Returns
+    -------
+    str
+        Company website"""
+    stock = yf.Ticker(symbol)
     df_info = pd.DataFrame(stock.info.items(), columns=["Metric", "Value"])
     return df_info[df_info["Metric"] == "website"]["Value"].values[0]
 
 
 @log_start_end(log=logger)
-def get_hq(ticker: str) -> str:
-    """Gets google map url for headquarter"""
-    stock = yf.Ticker(ticker)
+def get_hq(symbol: str) -> str:
+    """Gets google map url for headquarter
+
+    Parameters
+    ----------
+    symbol: str
+        Stock ticker symbol
+
+    Returns
+    -------
+    str
+        Headquarter google maps url
+    """
+    stock = yf.Ticker(symbol)
     df_info = pd.DataFrame(stock.info.items(), columns=["Metric", "Value"])
     df_info = df_info.set_index("Metric")
 
@@ -216,33 +245,34 @@ def get_hq(ticker: str) -> str:
 
 
 @log_start_end(log=logger)
-def get_dividends(ticker: str) -> pd.DataFrame:
+def get_dividends(symbol: str) -> pd.DataFrame:
     """Get historical dividend for ticker
 
     Parameters
     ----------
-    ticker: str
-        Ticker to get dividend for
+    symbol: str
+        Ticker symbol to get dividend for
 
     Returns
     -------
     pd.DataFrame:
         Dataframe of dividends and dates
     """
-    return pd.DataFrame(yf.Ticker(ticker).dividends)
+    return pd.DataFrame(yf.Ticker(symbol).dividends)
 
 
 @log_start_end(log=logger)
 def get_mktcap(
-    ticker: str, start: datetime = (datetime.now() - timedelta(days=3 * 366))
+    symbol: str,
+    start_date: str = (datetime.now() - timedelta(days=3 * 366)).strftime("%Y-%m-%d"),
 ) -> Tuple[pd.DataFrame, str]:
     """Get market cap over time for ticker. [Source: Yahoo Finance]
 
     Parameters
     ----------
-    ticker: str
+    symbol: str
         Ticker to get market cap over time
-    start: datetime
+    start_date: str
         Start date to display market cap
 
     Returns
@@ -253,10 +283,10 @@ def get_mktcap(
         Currency of ticker
     """
     currency = ""
-    df_data = yf.download(ticker, start=start, progress=False, threads=False)
+    df_data = yf.download(symbol, start=start_date, progress=False, threads=False)
     if not df_data.empty:
 
-        data = yf.Ticker(ticker).info
+        data = yf.Ticker(symbol).info
         if data:
             df_data["Adj Close"] = df_data["Adj Close"] * data["sharesOutstanding"]
             df_data = df_data["Adj Close"]
@@ -267,22 +297,130 @@ def get_mktcap(
 
 
 @log_start_end(log=logger)
-def get_splits(ticker: str) -> pd.DataFrame:
+def get_splits(symbol: str) -> pd.DataFrame:
     """Get splits and reverse splits events. [Source: Yahoo Finance]
 
     Parameters
     ----------
-    ticker: str
+    symbol: str
         Ticker to get forward and reverse splits
-    start: datetime
-        Start date to display market cap
 
     Returns
     -------
     pd.DataFrame:
         Dataframe of forward and reverse splits
     """
-    data = yf.Ticker(ticker).splits
+    data = yf.Ticker(symbol).splits
     if not data.empty:
         return data.to_frame()
     return pd.DataFrame()
+
+
+@log_start_end(log=logger)
+def get_financials(symbol: str, statement: str, ratios: bool = False) -> pd.DataFrame:
+    """Get cashflow statement for company
+
+    Parameters
+    ----------
+    symbol : str
+        Stock ticker symbol
+    statement: str
+        can be:
+            cash-flow
+            financials for Income
+            balance-sheet
+    ratios: bool
+        Shows percentage change
+
+    Returns
+    -------
+    pd.DataFrame
+        Dataframe of Financial statement
+    """
+    url = (
+        "https://uk.finance.yahoo.com/quote/"
+        + symbol
+        + "/"
+        + statement
+        + "?p="
+        + symbol
+    )
+
+    # Making the website believe that you are accessing it using a Mozilla browser
+    req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+
+    webpage = urlopen(req).read()  # pylint: disable= R1732
+    soup = BeautifulSoup(webpage, "html.parser")
+
+    features = soup.find_all("div", class_="D(tbr)")
+    headers = []
+    temp_list = []
+    final = []
+    if len(features) == 0:
+        return console.print("No data found in Yahoo Finance\n")
+
+    index = 0  # create headers
+    for item in features[0].find_all("div", class_="D(ib)"):
+        headers.append(item.text)  # statement contents
+    while index <= len(features) - 1:
+        # filter for each line of the statement
+        temp = features[index].find_all("div", class_="D(tbc)")
+        for line in temp:
+            # each item adding to a temporary list
+            temp_list.append(line.text)
+        # temp_list added to final list
+        final.append(temp_list)
+        # clear temp_list
+        temp_list = []
+        index += 1
+
+    df = pd.DataFrame(final[1:])
+    new_headers = []
+
+    if statement == "balance-sheet":
+        for dates in headers[1:]:
+            read = datetime.strptime(dates, "%d/%m/%Y")
+            write = read.strftime("%Y-%m-%d")
+            new_headers.append(write)
+        new_headers[:0] = ["Breakdown"]
+        df.columns = new_headers
+        df.set_index("Breakdown", inplace=True)
+    elif statement == "financials":
+        for dates in headers[2:]:
+            read = datetime.strptime(dates, "%d/%m/%Y")
+            write = read.strftime("%Y-%m-%d")
+            new_headers.append(write)
+        new_headers[:0] = ["Breakdown", "ttm"]
+        df.columns = new_headers
+        df.set_index("Breakdown", inplace=True)
+    elif statement == "cash-flow":
+        for dates in headers[2:]:
+            read = datetime.strptime(dates, "%d/%m/%Y")
+            write = read.strftime("%Y-%m-%d")
+            new_headers.append(write)
+        new_headers[:0] = ["Breakdown", "ttm"]
+        df.columns = new_headers
+        df.set_index("Breakdown", inplace=True)
+    df.replace("", np.nan, inplace=True)
+
+    if ratios:
+        df = df.replace(",", "", regex=True)
+        df = df.replace("-", "0")
+        df = df.astype(float)
+        types = df.copy().applymap(lambda x: isinstance(x, (float, int)))
+        types = types.all(axis=1)
+
+        # For rows with complete data
+        valid = []
+        i = 0
+        for row in types:
+            if row:
+                valid.append(i)
+            i += 1
+        df_fa_pc = df.iloc[valid].pct_change(axis="columns", periods=-1).fillna(0)
+        j = 0
+        for i in valid:
+            df.iloc[i] = df_fa_pc.iloc[j]
+            j += 1
+
+    return df.dropna(how="all")

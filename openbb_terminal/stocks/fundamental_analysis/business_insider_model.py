@@ -16,13 +16,13 @@ logger = logging.getLogger(__name__)
 
 
 @log_start_end(log=logger)
-def get_management(ticker: str) -> pd.DataFrame:
+def get_management(symbol: str) -> pd.DataFrame:
     """Get company managers from Business Insider
 
     Parameters
     ----------
-    ticker : str
-        Stock ticker
+    symbol : str
+        Stock ticker symbol
 
     Returns
     -------
@@ -30,7 +30,7 @@ def get_management(ticker: str) -> pd.DataFrame:
         Dataframe of managers
     """
     url_market_business_insider = (
-        f"https://markets.businessinsider.com/stocks/{ticker.lower()}-stock"
+        f"https://markets.businessinsider.com/stocks/{symbol.lower()}-stock"
     )
     text_soup_market_business_insider = BeautifulSoup(
         requests.get(
@@ -49,8 +49,24 @@ def get_management(ticker: str) -> pd.DataFrame:
         if next_table:
             found_h2s[next_h2.text] = next_table
 
+    # Business Insider changed management display convention from 'Management' to
+    # 'Ticker Management'. These next few lines simply find 'Ticker Management'
+    # header key and copy it to a 'Management' key as to not alter the rest of
+    # the function
+    ticker_management_to_be_deleted = ""
+    management_data_available = False
+    for key in found_h2s:
+        if "Management" in key:
+            ticker_management_to_be_deleted = key
+            management_data_available = True
+    if management_data_available:
+        found_h2s["Management"] = found_h2s[ticker_management_to_be_deleted]
+        del found_h2s[ticker_management_to_be_deleted]
+
     if found_h2s.get("Management") is None:
-        console.print(f"No management information in Business Insider for {ticker}")
+        console.print(
+            f"[red]No management information in Business Insider for {symbol}[/red]"
+        )
         console.print("")
         return pd.DataFrame()
 
@@ -70,7 +86,7 @@ def get_management(ticker: str) -> pd.DataFrame:
         l_names.append(s_name.text.strip())
 
     df_management = pd.DataFrame(
-        {"Name": l_names[-len(l_titles) :], "Title": l_titles},
+        {"Name": l_names[-len(l_titles) :], "Title": l_titles},  # noqa: E203
         columns=["Name", "Title"],
     )
 
@@ -81,7 +97,7 @@ def get_management(ticker: str) -> pd.DataFrame:
     for s_name in df_management.index:
         df_management.loc[s_name][
             "Info"
-        ] = f"http://www.google.com/search?q={s_name} {ticker.upper()}".replace(
+        ] = f"http://www.google.com/search?q={s_name} {symbol.upper()}".replace(
             " ", "%20"
         )
 

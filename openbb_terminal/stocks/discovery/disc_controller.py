@@ -15,13 +15,12 @@ from openbb_terminal.helper_funcs import (
     check_int_range,
     check_non_negative,
     check_positive,
-    parse_known_args_and_warn,
     valid_date,
     valid_date_in_past,
 )
 from openbb_terminal.menu import session
 from openbb_terminal.parent_classes import BaseController
-from openbb_terminal.rich_config import console
+from openbb_terminal.rich_config import console, MenuText
 from openbb_terminal.stocks.discovery import (
     ark_view,
     fidelity_view,
@@ -108,7 +107,7 @@ class DiscoveryController(BaseController):
         "Payment Date",
         "Record Date",
         "Dividend",
-        "Indicated Annual Dividend",
+        "Annual Dividend",
         "Announcement Date",
     ]
 
@@ -122,7 +121,6 @@ class DiscoveryController(BaseController):
             choices["arkord"]["--sortby"] = {
                 c: None for c in self.arkord_sortby_choices
             }
-            choices["arkord"]["-f"] = {c: None for c in self.arkord_fund_choices}
             choices["arkord"]["--fund"] = {c: None for c in self.arkord_fund_choices}
             choices["cnews"]["-t"] = {c: None for c in self.cnews_type_choices}
             choices["cnews"]["--type"] = {c: None for c in self.cnews_type_choices}
@@ -133,35 +131,26 @@ class DiscoveryController(BaseController):
 
     def print_help(self):
         """Print help"""
-        help_text = """[cmds]
-[src][Finnhub][/src]
-    pipo           past IPOs dates
-    fipo           future IPOs dates
-[src][Yahoo Finance][/src]
-    gainers        show latest top gainers
-    losers         show latest top losers
-    ugs            undervalued stocks with revenue and earnings growth in excess of 25%
-    gtech          tech stocks with revenue and earnings growth more than 25%
-    active         most active stocks by intraday trade volume
-    ulc            potentially undervalued large cap stocks
-    asc            small cap stocks with earnings growth rates better than 25%
-[src][Fidelity][/src]
-    ford           orders by Fidelity Customers
-[src][Cathiesark.com][/src]
-    arkord         orders by ARK Investment Management LLC
-[src][Seeking Alpha][/src]
-    upcoming       upcoming earnings release dates
-    trending       trending news
-    cnews          customized news (buybacks, ipos, spacs, healthcare, politics)
-[src][Shortinterest.com][/src]
-    lowfloat       low float stocks under 10M shares float
-[src][Pennystockflow.com][/src]
-    hotpenny       today's hot penny stocks
-[src][NASDAQ Data Link (Formerly Quandl)][/src]
-    rtat           top 10 retail traded stocks per day
-    divcal         dividend calendar for selected date[/cmds]
-"""
-        console.print(text=help_text, menu="Stocks - Discovery")
+        mt = MenuText("stocks/disc/")
+        mt.add_cmd("pipo", "Finnhub")
+        mt.add_cmd("fipo", "Finnhub")
+        mt.add_cmd("gainers", "Yahoo Finance")
+        mt.add_cmd("losers", "Yahoo Finance")
+        mt.add_cmd("ugs", "Yahoo Finance")
+        mt.add_cmd("gtech", "Yahoo Finance")
+        mt.add_cmd("active", "Yahoo Finance")
+        mt.add_cmd("ulc", "Yahoo Finance")
+        mt.add_cmd("asc", "Yahoo Finance")
+        mt.add_cmd("ford", "Fidelity")
+        mt.add_cmd("arkord", "Cathies Ark")
+        mt.add_cmd("upcoming", "Seeking Alpha")
+        mt.add_cmd("trending", "Seeking Alpha")
+        mt.add_cmd("cnews", "Seeking Alpha")
+        mt.add_cmd("lowfloat", "Fidelity")
+        mt.add_cmd("hotpenny", "Shortinterest")
+        mt.add_cmd("rtat", "NASDAQ Data Link")
+        mt.add_cmd("divcal", "NASDAQ Data Link")
+        console.print(text=mt.menu_text, menu="Stocks - Discovery")
 
     # TODO Add flag for adding last price to the following table
     @log_start_end(log=logger)
@@ -200,7 +189,7 @@ class DiscoveryController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-d")
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED, limit=10
         )
         if ns_parser:
@@ -210,7 +199,7 @@ class DiscoveryController(BaseController):
                 return
             nasdaq_view.display_dividend_calendar(
                 ns_parser.date.strftime("%Y-%m-%d"),
-                sort_col=sort_col,
+                sortby=sort_col,
                 ascending=ns_parser.ascend,
                 limit=ns_parser.limit,
                 export=ns_parser.export,
@@ -259,7 +248,7 @@ class DiscoveryController(BaseController):
 
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
@@ -314,7 +303,7 @@ class DiscoveryController(BaseController):
 
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
 
@@ -346,12 +335,12 @@ class DiscoveryController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             yahoofinance_view.display_gainers(
-                num_stocks=ns_parser.limit,
+                limit=ns_parser.limit,
                 export=ns_parser.export,
             )
 
@@ -375,12 +364,12 @@ class DiscoveryController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             yahoofinance_view.display_losers(
-                num_stocks=ns_parser.limit,
+                limit=ns_parser.limit,
                 export=ns_parser.export,
             )
 
@@ -407,12 +396,12 @@ class DiscoveryController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             yahoofinance_view.display_ugs(
-                num_stocks=ns_parser.limit,
+                limit=ns_parser.limit,
                 export=ns_parser.export,
             )
 
@@ -437,12 +426,12 @@ class DiscoveryController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             yahoofinance_view.display_gtech(
-                num_stocks=ns_parser.limit,
+                limit=ns_parser.limit,
                 export=ns_parser.export,
             )
 
@@ -468,12 +457,12 @@ class DiscoveryController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             yahoofinance_view.display_active(
-                num_stocks=ns_parser.limit,
+                limit=ns_parser.limit,
                 export=ns_parser.export,
             )
 
@@ -499,12 +488,12 @@ class DiscoveryController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             yahoofinance_view.display_ulc(
-                num_stocks=ns_parser.limit,
+                limit=ns_parser.limit,
                 export=ns_parser.export,
             )
 
@@ -530,12 +519,12 @@ class DiscoveryController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             yahoofinance_view.display_asc(
-                num_stocks=ns_parser.limit,
+                limit=ns_parser.limit,
                 export=ns_parser.export,
             )
 
@@ -564,12 +553,12 @@ class DiscoveryController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             fidelity_view.orders_view(
-                num=ns_parser.limit,
+                limit=ns_parser.limit,
                 export=ns_parser.export,
             )
 
@@ -627,7 +616,6 @@ class DiscoveryController(BaseController):
             default=False,
         )
         parser.add_argument(
-            "-f",
             "--fund",
             type=str,
             default="",
@@ -637,13 +625,13 @@ class DiscoveryController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             ark_view.ark_orders_view(
-                num=ns_parser.limit,
-                sort_col=ns_parser.sort_col,
+                limit=ns_parser.limit,
+                sortby=ns_parser.sort_col,
                 ascending=ns_parser.ascend,
                 buys_only=ns_parser.buys_only,
                 sells_only=ns_parser.sells_only,
@@ -681,13 +669,13 @@ class DiscoveryController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             seeking_alpha_view.upcoming_earning_release_dates(
                 num_pages=ns_parser.n_pages,
-                num_earnings=ns_parser.limit,
+                limit=ns_parser.limit,
                 export=ns_parser.export,
             )
 
@@ -729,13 +717,13 @@ class DiscoveryController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-i")
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             seeking_alpha_view.news(
                 article_id=ns_parser.n_id,
-                num=ns_parser.limit,
+                limit=ns_parser.limit,
                 export=ns_parser.export,
             )
 
@@ -765,12 +753,12 @@ class DiscoveryController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             shortinterest_view.low_float(
-                num=ns_parser.limit,
+                limit=ns_parser.limit,
                 export=ns_parser.export,
             )
 
@@ -804,13 +792,13 @@ class DiscoveryController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-t")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             seeking_alpha_view.display_news(
                 news_type=ns_parser.s_type,
-                num=ns_parser.limit,
+                limit=ns_parser.limit,
                 export=ns_parser.export,
             )
 
@@ -821,15 +809,7 @@ class DiscoveryController(BaseController):
             add_help=False,
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             prog="hotpenny",
-            description="""
-                This site provides a list of todays most active and hottest penny stocks. While not for everyone, penny
-                stocks can be exciting and rewarding investments in many ways. With penny stocks, you can get more bang
-                for the buck. You can turn a few hundred dollars into thousands, just by getting in on the right penny
-                stock at the right time. Penny stocks are increasing in popularity. More and more investors of all age
-                groups and skill levels are getting involved, and the dollar amounts they are putting into these
-                speculative investments are representing a bigger portion of their portfolios.
-                [Source: www.pennystockflow.com]
-            """,
+            description="Provides top penny stocks from various websites. [Source: Yfinance]",
         )
         parser.add_argument(
             "-l",
@@ -843,13 +823,14 @@ class DiscoveryController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             shortinterest_view.hot_penny_stocks(
-                num=ns_parser.limit,
+                limit=ns_parser.limit,
                 export=ns_parser.export,
+                source=ns_parser.source,
             )
 
     @log_start_end(log=logger)
@@ -876,10 +857,10 @@ class DiscoveryController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             nasdaq_view.display_top_retail(
-                n_days=ns_parser.limit, export=ns_parser.export
+                limit=ns_parser.limit, export=ns_parser.export
             )

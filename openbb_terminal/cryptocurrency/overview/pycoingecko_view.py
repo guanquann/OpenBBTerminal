@@ -21,6 +21,7 @@ from openbb_terminal.helper_funcs import (
     export_data,
     plot_autoscale,
     print_rich_table,
+    is_valid_axes_count,
 )
 from openbb_terminal.rich_config import console
 
@@ -28,15 +29,14 @@ logger = logging.getLogger(__name__)
 
 register_matplotlib_converters()
 
-# pylint: disable=inconsistent-return-statements
 # pylint: disable=R0904, C0302
 
 
 @log_start_end(log=logger)
 def display_crypto_heatmap(
-    category: str,
-    top: int,
-    export: str,
+    category: str = "",
+    top: int = 15,
+    export: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
 ) -> None:
     """Shows cryptocurrencies heatmap [Source: CoinGecko]
@@ -56,6 +56,9 @@ def display_crypto_heatmap(
     if df.empty:
         console.print("\nNo cryptocurrencies found\n")
     else:
+        df = df.fillna(
+            0
+        )  # to prevent errors with rounding when values aren't available
         max_abs = max(
             -df.price_change_percentage_24h_in_currency.min(),
             df.price_change_percentage_24h_in_currency.max(),
@@ -69,29 +72,44 @@ def display_crypto_heatmap(
             else:
                 colors.append(cmapred(-round(val * 100)))
 
-        # This plot has 2 axes
+        # This plot has 1 axis
         if external_axes is None:
             _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
-        else:
-            if len(external_axes) != 1:
-                console.print("[red]Expected list of 1 axis item./n[/red]")
-                return
+        elif is_valid_axes_count(external_axes, 1):
             (ax,) = external_axes
+        else:
+            return
 
         category_str = f"[{category}]" if category else ""
         df_copy = df
+        the_row = "price_change_percentage_24h_in_currency"
         df_copy["symbol"] = df_copy.apply(
-            lambda row: f"{row['symbol'].upper()}\n{round(row['price_change_percentage_24h_in_currency'], 2)}%",
+            lambda row: f"{row['symbol'].upper()}\n{round(row[the_row], 2)}%",
             axis=1,
         )
 
         squarify.plot(
             df["market_cap"],
-            label=df_copy["symbol"],
             alpha=0.8,
             color=colors,
-            text_kwargs={"color": "black", "size": 8},
         )
+        text_sizes = squarify.normalize_sizes(df["market_cap"], 100, 100)
+        rects = squarify.squarify(text_sizes, 0, 0, 100, 100)
+        for la, r in zip(df_copy["symbol"], rects):
+            x, y, dx, dy = r["x"], r["y"], r["dx"], r["dy"]
+            ax.text(
+                x + dx / 2,
+                y + dy / 2,
+                la,
+                va="center",
+                ha="center",
+                color="black",
+                size=(
+                    text_sizes[df_copy.index[df_copy["symbol"] == la].tolist()[0]]
+                    ** 0.5
+                    * 0.8
+                ),
+            )
         ax.set_title(f"Top {top} Cryptocurrencies {category_str}")
         ax.set_axis_off()
 
@@ -109,18 +127,24 @@ def display_crypto_heatmap(
 
 
 @log_start_end(log=logger)
-def display_holdings_overview(coin: str, show_bar: bool, export: str, top: int) -> None:
+def display_holdings_overview(
+    symbol: str, show_bar: bool = False, export: str = "", top: int = 15
+) -> None:
     """Shows overview of public companies that holds ethereum or bitcoin. [Source: CoinGecko]
 
     Parameters
     ----------
-    coin: str
+    symbol: str
         Cryptocurrency: ethereum or bitcoin
+    show_bar : bool
+        Whether to show a bar graph for the data
     export: str
         Export dataframe data to csv,json,xlsx
+    top: int
+        The number of rows to show
     """
 
-    res = gecko.get_holdings_overview(coin)
+    res = gecko.get_holdings_overview(symbol)
     stats_string = res[0]
     df = res[1]
 
@@ -153,7 +177,6 @@ def display_holdings_overview(coin: str, show_bar: bool, export: str, top: int) 
             show_index=False,
             title="Public Companies Holding BTC or ETH",
         )
-        console.print("")
 
         export_data(
             export,
@@ -164,7 +187,9 @@ def display_holdings_overview(coin: str, show_bar: bool, export: str, top: int) 
 
 
 @log_start_end(log=logger)
-def display_exchange_rates(sortby: str, descend: bool, top: int, export: str) -> None:
+def display_exchange_rates(
+    sortby: str = "Name", ascend: bool = False, top: int = 15, export: str = ""
+) -> None:
     """Shows  list of crypto, fiats, commodity exchange rates. [Source: CoinGecko]
 
     Parameters
@@ -173,13 +198,13 @@ def display_exchange_rates(sortby: str, descend: bool, top: int, export: str) ->
         Number of records to display
     sortby: str
         Key by which to sort data
-    descend: bool
-        Flag to sort data descending
+    ascend: bool
+        Flag to sort data ascending
     export : str
         Export dataframe data to csv,json,xlsx file
     """
 
-    df = gecko.get_exchange_rates().sort_values(by=sortby, ascending=descend)
+    df = gecko.get_exchange_rates(sortby, ascend)
 
     if not df.empty:
         print_rich_table(
@@ -188,7 +213,6 @@ def display_exchange_rates(sortby: str, descend: bool, top: int, export: str) ->
             show_index=False,
             title="Exchange Rates",
         )
-        console.print("")
 
         export_data(
             export,
@@ -203,7 +227,7 @@ def display_exchange_rates(sortby: str, descend: bool, top: int, export: str) ->
 
 
 @log_start_end(log=logger)
-def display_global_market_info(pie: bool, export: str) -> None:
+def display_global_market_info(pie: bool = False, export: str = "") -> None:
     """Shows global statistics about crypto. [Source: CoinGecko]
         - market cap change
         - number of markets
@@ -213,6 +237,8 @@ def display_global_market_info(pie: bool, export: str) -> None:
 
     Parameters
     ----------
+    pie: bool
+        Whether to show a pie chart
     export : str
         Export dataframe data to csv,json,xlsx file
     """
@@ -252,7 +278,6 @@ def display_global_market_info(pie: bool, export: str) -> None:
         print_rich_table(
             df, headers=list(df.columns), show_index=False, title="Global Statistics"
         )
-        console.print("")
 
         export_data(
             export,
@@ -267,7 +292,7 @@ def display_global_market_info(pie: bool, export: str) -> None:
 
 
 @log_start_end(log=logger)
-def display_global_defi_info(export: str) -> None:
+def display_global_defi_info(export: str = "") -> None:
     """Shows global statistics about Decentralized Finances. [Source: CoinGecko]
 
     Parameters
@@ -285,7 +310,6 @@ def display_global_defi_info(export: str) -> None:
             show_index=False,
             title="Global DEFI Statistics",
         )
-        console.print("")
 
         export_data(
             export,
@@ -301,7 +325,11 @@ def display_global_defi_info(export: str) -> None:
 
 @log_start_end(log=logger)
 def display_stablecoins(
-    top: int, export: str, sortby: str, descend: bool, pie: bool
+    top: int = 15,
+    export: str = "",
+    sortby: str = "rank",
+    ascend: bool = False,
+    pie: bool = False,
 ) -> None:
     """Shows stablecoins data [Source: CoinGecko]
 
@@ -311,19 +339,20 @@ def display_stablecoins(
         Number of records to display
     sortby: str
         Key by which to sort data
-    descend: bool
-        Flag to sort data descending
+    ascend: bool
+        Flag to sort data ascending
     export : str
         Export dataframe data to csv,json,xlsx file
+    pie : bool
+        Whether to show a pie chart
     """
 
-    df = gecko.get_stable_coins(top)
+    df = gecko.get_stable_coins(top, sortby=sortby, ascend=ascend)
 
     if not df.empty:
         total_market_cap = int(df["market_cap"].sum())
         df[f"Percentage [%] of top {top}"] = (df["market_cap"] / total_market_cap) * 100
         df_data = df
-        df = df.sort_values(by=sortby, ascending=descend).head(top)
         df = df.set_axis(
             [
                 "Symbol",
@@ -363,9 +392,9 @@ def display_stablecoins(
                 plt.ion()
             plt.show()
         console.print(
-            f"""
-First {top} stablecoins have a total {lambda_long_number_format_with_type_check(total_market_cap)} dollars of market cap.
-"""
+            f"First {top} stablecoins have a total "
+            f"{lambda_long_number_format_with_type_check(total_market_cap)}"
+            "dollars of market cap."
         )
         print_rich_table(
             df.head(top),
@@ -373,7 +402,6 @@ First {top} stablecoins have a total {lambda_long_number_format_with_type_check(
             show_index=False,
             title="Stablecoin Data",
         )
-        console.print("")
 
         export_data(
             export,
@@ -386,19 +414,23 @@ First {top} stablecoins have a total {lambda_long_number_format_with_type_check(
 
 
 @log_start_end(log=logger)
-def display_categories(sortby: str, top: int, export: str, pie: bool) -> None:
+def display_categories(
+    sortby: str = "market_cap_desc", top: int = 15, export: str = "", pie: bool = False
+) -> None:
     """Shows top cryptocurrency categories by market capitalization
 
     The cryptocurrency category ranking is based on market capitalization. [Source: CoinGecko]
 
     Parameters
     ----------
-    top: int
-        Number of records to display
     sortby: str
         Key by which to sort data
-    export : str
+    top: int
+        Number of records to display
+    export: str
         Export dataframe data to csv,json,xlsx file
+    pie: bool
+        Whether to show the pie chart
     """
 
     df = gecko.get_top_crypto_categories(sortby)
@@ -433,7 +465,6 @@ def display_categories(sortby: str, top: int, export: str, pie: bool) -> None:
             floatfmt=".2f",
             show_index=False,
         )
-        console.print("")
 
         export_data(
             export,
@@ -447,7 +478,11 @@ def display_categories(sortby: str, top: int, export: str, pie: bool) -> None:
 
 @log_start_end(log=logger)
 def display_exchanges(
-    sortby: str, descend: bool, top: int, links: bool, export: str
+    sortby: str = "name",
+    ascend: bool = False,
+    top: int = 15,
+    links: bool = False,
+    export: str = "",
 ) -> None:
     """Shows list of top exchanges from CoinGecko. [Source: CoinGecko]
 
@@ -457,7 +492,7 @@ def display_exchanges(
         Number of records to display
     sortby: str
         Key by which to sort data
-    descend: bool
+    ascend: bool
         Flag to sort data descending
     links: bool
         Flag to display urls
@@ -465,10 +500,9 @@ def display_exchanges(
         Export dataframe data to csv,json,xlsx file
     """
 
-    df = gecko.get_exchanges()
+    df = gecko.get_exchanges(sortby, ascend)
 
     if not df.empty:
-        df = df.sort_values(by=sortby, ascending=descend)
 
         if links is True:
             df = df[["Rank", "Name", "Url"]]
@@ -481,7 +515,6 @@ def display_exchanges(
             show_index=False,
             title="Top CoinGecko Exchanges",
         )
-        console.print("")
 
         export_data(
             export,
@@ -496,7 +529,9 @@ def display_exchanges(
 
 
 @log_start_end(log=logger)
-def display_platforms(sortby: str, descend: bool, top: int, export: str) -> None:
+def display_platforms(
+    sortby: str = "Name", ascend: bool = True, top: int = 15, export: str = ""
+) -> None:
     """Shows list of financial platforms. [Source: CoinGecko]
 
     Parameters
@@ -505,24 +540,21 @@ def display_platforms(sortby: str, descend: bool, top: int, export: str) -> None
         Number of records to display
     sortby: str
         Key by which to sort data
-    descend: bool
-        Flag to sort data descending
+    ascend: bool
+        Flag to sort data ascending
     export : str
         Export dataframe data to csv,json,xlsx file
     """
 
-    df = gecko.get_financial_platforms()
+    df = gecko.get_financial_platforms(sortby, ascend)
 
     if not df.empty:
-        df = df.sort_values(by=sortby, ascending=descend)
-
         print_rich_table(
             df.head(top),
             headers=list(df.columns),
             show_index=False,
             title="Financial Platforms",
         )
-        console.print("")
 
         export_data(
             export,
@@ -531,13 +563,13 @@ def display_platforms(sortby: str, descend: bool, top: int, export: str) -> None
             df,
         )
     else:
-        console.print("")
-        console.print("Unable to retrieve data from CoinGecko.")
-        console.print("")
+        console.print("\nUnable to retrieve data from CoinGecko.\n")
 
 
 @log_start_end(log=logger)
-def display_products(sortby: str, descend: bool, top: int, export: str) -> None:
+def display_products(
+    sortby: str = "Platform", ascend: bool = False, top: int = 15, export: str = ""
+) -> None:
     """Shows list of financial products. [Source: CoinGecko]
 
     Parameters
@@ -546,24 +578,21 @@ def display_products(sortby: str, descend: bool, top: int, export: str) -> None:
         Number of records to display
     sortby: str
         Key by which to sort data
-    descend: bool
+    ascend: bool
         Flag to sort data descending
     export : str
         Export dataframe data to csv,json,xlsx file
     """
 
-    df = gecko.get_finance_products()
+    df = gecko.get_finance_products(sortby=sortby, ascend=ascend)
 
     if not df.empty:
-        df = df.sort_values(by=sortby, ascending=descend)
-
         print_rich_table(
             df.head(top),
             headers=list(df.columns),
             show_index=False,
             title="Financial Products",
         )
-        console.print("")
 
         export_data(
             export,
@@ -578,7 +607,9 @@ def display_products(sortby: str, descend: bool, top: int, export: str) -> None:
 
 
 @log_start_end(log=logger)
-def display_indexes(sortby: str, descend: bool, top: int, export: str) -> None:
+def display_indexes(
+    sortby: str = "Name", ascend: bool = True, top: int = 15, export: str = ""
+) -> None:
     """Shows list of crypto indexes. [Source: CoinGecko]
 
     Parameters
@@ -587,23 +618,20 @@ def display_indexes(sortby: str, descend: bool, top: int, export: str) -> None:
         Number of records to display
     sortby: str
         Key by which to sort data
-    descend: bool
+    ascend: bool
         Flag to sort data descending
     export : str
         Export dataframe data to csv,json,xlsx file
     """
 
-    df = gecko.get_indexes()
+    df = gecko.get_indexes(sortby=sortby, ascend=ascend)
     if not df.empty:
-        df = df.sort_values(by=sortby, ascending=descend)
-
         print_rich_table(
             df.head(top),
             headers=list(df.columns),
             show_index=False,
             title="Crypto Indexes",
         )
-        console.print("")
 
         export_data(
             export,
@@ -618,7 +646,9 @@ def display_indexes(sortby: str, descend: bool, top: int, export: str) -> None:
 
 
 @log_start_end(log=logger)
-def display_derivatives(sortby: str, descend: bool, top: int, export: str) -> None:
+def display_derivatives(
+    sortby: str = "Rank", ascend: bool = False, top: int = 15, export: str = ""
+) -> None:
     """Shows  list of crypto derivatives. [Source: CoinGecko]
 
     Parameters
@@ -627,16 +657,15 @@ def display_derivatives(sortby: str, descend: bool, top: int, export: str) -> No
         Number of records to display
     sortby: str
         Key by which to sort data
-    descend: bool
+    ascend: bool
         Flag to sort data descending
     export : str
         Export dataframe data to csv,json,xlsx file
     """
 
-    df = gecko.get_derivatives()
+    df = gecko.get_derivatives(sortby=sortby, ascend=ascend)
 
     if not df.empty:
-        df = df.sort_values(by=sortby, ascending=descend)
 
         print_rich_table(
             df.head(top),
@@ -644,7 +673,6 @@ def display_derivatives(sortby: str, descend: bool, top: int, export: str) -> No
             show_index=False,
             title="Crypto Derivatives",
         )
-        console.print("")
 
         export_data(
             export,

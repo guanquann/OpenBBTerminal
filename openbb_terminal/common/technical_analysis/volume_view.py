@@ -12,17 +12,21 @@ from openbb_terminal.config_terminal import theme
 from openbb_terminal.common.technical_analysis import volume_model
 from openbb_terminal.config_plot import PLOT_DPI
 from openbb_terminal.decorators import log_start_end
-from openbb_terminal.helper_funcs import export_data, plot_autoscale, reindex_dates
-from openbb_terminal.rich_config import console
+from openbb_terminal.helper_funcs import (
+    export_data,
+    plot_autoscale,
+    reindex_dates,
+    is_valid_axes_count,
+)
 
 logger = logging.getLogger(__name__)
 
 
 @log_start_end(log=logger)
 def display_ad(
-    ohlc: pd.DataFrame,
+    data: pd.DataFrame,
     use_open: bool = False,
-    s_ticker: str = "",
+    symbol: str = "",
     export: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
 ):
@@ -30,25 +34,25 @@ def display_ad(
 
     Parameters
     ----------
-    ohlc : pd.DataFrame
-        Dataframe of prices
+    data : pd.DataFrame
+        Dataframe of ohlc prices
     use_open : bool
         Whether to use open prices in calculation
-    s_ticker : str
-        Ticker
+    symbol : str
+        Ticker symbol
     export: str
         Format to export data as
     external_axes : Optional[List[plt.Axes]], optional
-        External axes (3 axes is expected in the list), by default None
+        External axes (3 axes are expected in the list), by default None
     """
     divisor = 1_000_000
-    df_vol = ohlc["Volume"] / divisor
+    df_vol = data["Volume"] / divisor
     df_vol.name = "Adj Volume"
-    df_ta = volume_model.ad(ohlc, use_open)
+    df_ta = volume_model.ad(data, use_open)
     df_cal = df_ta["AD"] / divisor
     df_cal.name = "Adj AD"
 
-    plot_data = pd.merge(ohlc, df_vol, how="outer", left_index=True, right_index=True)
+    plot_data = pd.merge(data, df_vol, how="outer", left_index=True, right_index=True)
     plot_data = pd.merge(
         plot_data, df_ta, how="outer", left_index=True, right_index=True
     )
@@ -67,15 +71,13 @@ def display_ad(
             dpi=PLOT_DPI,
         )
         ax1, ax2, ax3 = axes
-    else:
-        if len(external_axes) != 3:
-            logger.error("Expected list of three axis items.")
-            console.print("[red]Expected list of 3 axis items./n[/red]")
-            return
+    elif is_valid_axes_count(external_axes, 3):
         (ax1, ax2, ax3) = external_axes
+    else:
+        return
 
     ax1.plot(plot_data.index, plot_data["Adj Close"].values)
-    ax1.set_title(f"{s_ticker} AD", x=0.08, y=1)
+    ax1.set_title(f"{symbol} AD", x=0.08, y=1)
     ax1.set_xlim(plot_data.index[0], plot_data.index[-1])
     ax1.set_ylabel("Price")
     theme.style_primary_axis(
@@ -125,11 +127,11 @@ def display_ad(
 
 @log_start_end(log=logger)
 def display_adosc(
-    ohlc: pd.DataFrame,
+    data: pd.DataFrame,
     fast: int = 3,
     slow: int = 10,
     use_open: bool = False,
-    s_ticker: str = "",
+    symbol: str = "",
     export: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
 ):
@@ -137,29 +139,29 @@ def display_adosc(
 
     Parameters
     ----------
-    ohlc : pd.DataFrame
-        Dataframe of prices
+    data : pd.DataFrame
+        Dataframe of ohlc prices
     use_open : bool
         Whether to use open prices in calculation
     fast: int
          Length of fast window
     slow : int
         Length of slow window
-    s_ticker : str
+    symbol : str
         Stock ticker
     export : str
         Format to export data
     external_axes : Optional[List[plt.Axes]], optional
-        External axes (3 axes is expected in the list), by default None
+        External axes (3 axes are expected in the list), by default None
     """
     divisor = 1_000_000
-    df_vol = ohlc["Volume"] / divisor
+    df_vol = data["Volume"] / divisor
     df_vol.name = "Adj Volume"
-    df_ta = volume_model.adosc(ohlc, use_open, fast, slow)
+    df_ta = volume_model.adosc(data, use_open, fast, slow)
     df_cal = df_ta[df_ta.columns[0]] / divisor
     df_cal.name = "Adj ADOSC"
 
-    plot_data = pd.merge(ohlc, df_vol, how="outer", left_index=True, right_index=True)
+    plot_data = pd.merge(data, df_vol, how="outer", left_index=True, right_index=True)
     plot_data = pd.merge(
         plot_data, df_ta, how="outer", left_index=True, right_index=True
     )
@@ -178,14 +180,12 @@ def display_adosc(
             dpi=PLOT_DPI,
         )
         ax1, ax2, ax3 = axes
-    else:
-        if len(external_axes) != 3:
-            logger.error("Expected list of three axis items.")
-            console.print("[red]Expected list of 3 axis items./n[/red]")
-            return
+    elif is_valid_axes_count(external_axes, 3):
         (ax1, ax2, ax3) = external_axes
+    else:
+        return
 
-    ax1.set_title(f"{s_ticker} AD Oscillator")
+    ax1.set_title(f"{symbol} AD Oscillator")
     ax1.plot(plot_data.index, plot_data["Adj Close"].values)
     ax1.set_xlim(plot_data.index[0], plot_data.index[-1])
     ax1.set_ylabel("Price")
@@ -235,8 +235,8 @@ def display_adosc(
 
 @log_start_end(log=logger)
 def display_obv(
-    ohlc: pd.DataFrame,
-    s_ticker: str = "",
+    data: pd.DataFrame,
+    symbol: str = "",
     export: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
 ):
@@ -244,9 +244,9 @@ def display_obv(
 
     Parameters
     ----------
-    ohlc : pd.DataFrame
-        Dataframe of prices
-    s_ticker : str
+    data : pd.DataFrame
+        Dataframe of ohlc prices
+    symbol : str
         Ticker
     export: str
         Format to export data as
@@ -254,13 +254,13 @@ def display_obv(
         External axes (1 axis is expected in the list), by default None
     """
     divisor = 1_000_000
-    df_vol = ohlc["Volume"] / divisor
+    df_vol = data["Volume"] / divisor
     df_vol.name = "Adj Volume"
-    df_ta = volume_model.obv(ohlc)
+    df_ta = volume_model.obv(data)
     df_cal = df_ta[df_ta.columns[0]] / divisor
     df_cal.name = "Adj OBV"
 
-    plot_data = pd.merge(ohlc, df_vol, how="outer", left_index=True, right_index=True)
+    plot_data = pd.merge(data, df_vol, how="outer", left_index=True, right_index=True)
     plot_data = pd.merge(
         plot_data, df_ta, how="outer", left_index=True, right_index=True
     )
@@ -279,15 +279,13 @@ def display_obv(
             dpi=PLOT_DPI,
         )
         ax1, ax2, ax3 = axes
-    else:
-        if len(external_axes) != 3:
-            logger.error("Expected list of three axis items.")
-            console.print("[red]Expected list of 3 axis items./n[/red]")
-            return
+    elif is_valid_axes_count(external_axes, 3):
         (ax1, ax2, ax3) = external_axes
+    else:
+        return
 
     ax1.plot(plot_data.index, plot_data["Adj Close"].values)
-    ax1.set_title(f"{s_ticker} OBV")
+    ax1.set_title(f"{symbol} OBV")
     ax1.set_xlim(plot_data.index[0], plot_data.index[-1])
     ax1.set_ylabel("Price")
     theme.style_primary_axis(

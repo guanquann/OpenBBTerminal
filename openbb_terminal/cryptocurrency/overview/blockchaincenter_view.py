@@ -2,6 +2,7 @@
 import logging
 import os
 from typing import List, Optional
+from datetime import datetime
 
 from matplotlib import pyplot as plt
 
@@ -12,7 +13,11 @@ from openbb_terminal.cryptocurrency.overview.blockchaincenter_model import (
     get_altcoin_index,
 )
 from openbb_terminal.decorators import log_start_end
-from openbb_terminal.helper_funcs import export_data, plot_autoscale
+from openbb_terminal.helper_funcs import (
+    export_data,
+    plot_autoscale,
+    is_valid_axes_count,
+)
 from openbb_terminal.rich_config import console
 
 logger = logging.getLogger(__name__)
@@ -20,9 +25,9 @@ logger = logging.getLogger(__name__)
 
 @log_start_end(log=logger)
 def display_altcoin_index(
-    period: int,
-    since: int,
-    until: int,
+    period: int = 365,
+    since: int = int(datetime(2010, 1, 1).timestamp()),
+    until: int = int(datetime.now().timestamp()),
     export: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
 ) -> None:
@@ -37,7 +42,7 @@ def display_altcoin_index(
         End date timestamp (e.g., 1_641_588_030)
     period: int
         Number of days to check the performance of coins and calculate the altcoin index.
-        E.g., 365 will check yearly performance (365 days), 90 will check seasonal performance (90 days),
+        E.g., 365 will check yearly performance , 90 will check seasonal performance (90 days),
         30 will check monthly performance (30 days).
     export : str
         Export dataframe data to csv,json,xlsx file
@@ -54,12 +59,10 @@ def display_altcoin_index(
             # This plot has 1 axis
             if not external_axes:
                 _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
-            else:
-                if len(external_axes) != 1:
-                    logger.error("Expected list of one axis item.")
-                    console.print("[red]Expected list of one axis item./n[/red]")
-                    return
+            elif is_valid_axes_count(external_axes, 1):
                 (ax,) = external_axes
+            else:
+                return
 
             ax.set_ylabel("Altcoin Index")
             ax.axhline(y=75, color=theme.up_color, label="Altcoin Season (75)")

@@ -17,12 +17,11 @@ from openbb_terminal.helper_funcs import (
     EXPORT_ONLY_RAW_DATA_ALLOWED,
     check_positive,
     check_proportion_range,
-    parse_known_args_and_warn,
     check_list_dates,
 )
 from openbb_terminal.menu import session
 from openbb_terminal.parent_classes import StockBaseController
-from openbb_terminal.rich_config import console
+from openbb_terminal.rich_config import console, MenuText
 
 logger = logging.getLogger(__name__)
 
@@ -85,38 +84,41 @@ class QaController(StockBaseController):
             choices: dict = {c: {} for c in self.controller_choices}
             choices["pick"] = {c: {} for c in self.options}
             choices["pick"]["-c"] = {c: {} for c in self.options}
+
+            choices["support"] = self.SUPPORT_CHOICES
+            choices["about"] = self.ABOUT_CHOICES
+
             self.completer = NestedCompleter.from_nested_dict(choices)
 
     def print_help(self):
         """Print help"""
-        help_text = f"""[cmds]
-    pick        pick new series from stored economy data[/cmds]
-
-[param]Selected Series[/param]: {self.current_id}
-[cmds]
-[info]Statistics:[/info]
-    summary     brief summary statistics of loaded stock.
-    normality   normality statistics and tests
-    unitroot    unit root test for stationarity (ADF, KPSS)
-[info]Plots:[/info]
-    line        line plot of selected target
-    hist        histogram with density plot
-    cdf         cumulative distribution function
-    bw          box and whisker plot
-    acf         (partial) auto-correlation function differentials of prices
-    qqplot      residuals against standard normal curve
-[info]Rolling Metrics:[/info]
-    rolling     rolling mean and std deviation of prices
-    spread      rolling variance and std deviation of prices
-    quantile    rolling median and quantile of prices
-    skew        rolling skewness of distribution of prices
-    kurtosis    rolling kurtosis of distribution of prices
-[info]Other:[/info]
-    raw         print raw data
-    decompose   decomposition in cyclic-trend, season, and residuals of prices
-    cusum       detects abrupt changes using cumulative sum algorithm of prices[/cmds]
-        """
-        console.print(text=help_text, menu="Stocks - Quantitative Analysis")
+        mt = MenuText("economy/qa/")
+        mt.add_cmd("pick")
+        mt.add_raw("\n")
+        mt.add_param("_series", self.current_id)
+        mt.add_raw("\n")
+        mt.add_info("_statistics_")
+        mt.add_cmd("summary")
+        mt.add_cmd("normality")
+        mt.add_cmd("unitroot")
+        mt.add_info("_plots_")
+        mt.add_cmd("line")
+        mt.add_cmd("hist")
+        mt.add_cmd("cdf")
+        mt.add_cmd("bw")
+        mt.add_cmd("acf")
+        mt.add_cmd("qqplot")
+        mt.add_info("_rolling_metrics_")
+        mt.add_cmd("rolling")
+        mt.add_cmd("spread")
+        mt.add_cmd("quantile")
+        mt.add_cmd("skew")
+        mt.add_cmd("kurtosis")
+        mt.add_info("_other_")
+        mt.add_cmd("raw")
+        mt.add_cmd("decompose")
+        mt.add_cmd("cusum")
+        console.print(text=mt.menu_text, menu="Economy - Quantitative Analysis")
 
     def custom_reset(self):
         """Class specific component of reset command"""
@@ -140,7 +142,7 @@ class QaController(StockBaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-c")
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             for source, sub_df in self.datasets.items():
                 if ns_parser.column in sub_df.columns:
@@ -187,15 +189,15 @@ class QaController(StockBaseController):
             help="Sort in descending order",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             qa_view.display_raw(
-                self.data,
-                num=ns_parser.limit,
-                sort="",
-                des=ns_parser.descend,
+                data=self.data,
+                limit=ns_parser.limit,
+                sortby="",
+                descend=ns_parser.descend,
                 export=ns_parser.export,
             )
 
@@ -210,12 +212,12 @@ class QaController(StockBaseController):
                 Summary statistics
             """,
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             qa_view.display_summary(
-                df=self.current_source_dataframe, export=ns_parser.export
+                data=self.current_source_dataframe, export=ns_parser.export
             )
 
     @log_start_end(log=logger)
@@ -257,7 +259,7 @@ class QaController(StockBaseController):
             default="",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_FIGURES_ALLOWED
         )
         if ns_parser:
@@ -284,11 +286,11 @@ class QaController(StockBaseController):
         parser.add_argument(
             "-b", "--bins", type=check_positive, default=15, dest="n_bins"
         )
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             qa_view.display_hist(
                 name="",
-                df=self.current_source_dataframe,
+                data=self.current_source_dataframe,
                 target=self.current_id,
                 bins=ns_parser.n_bins,
             )
@@ -304,13 +306,13 @@ class QaController(StockBaseController):
                 Cumulative distribution function
             """,
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             qa_view.display_cdf(
                 name="",
-                df=self.current_source_dataframe,
+                data=self.current_source_dataframe,
                 target=self.current_id,
                 export=ns_parser.export,
             )
@@ -334,11 +336,11 @@ class QaController(StockBaseController):
             dest="year",
             help="Flag to show yearly bw plot",
         )
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             qa_view.display_bw(
                 name="",
-                df=self.current_source_dataframe,
+                data=self.current_source_dataframe,
                 target=self.current_id,
                 yearly=ns_parser.year,
             )
@@ -364,13 +366,13 @@ class QaController(StockBaseController):
             dest="multiplicative",
             help="decompose using multiplicative model instead of additive",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             qa_view.display_seasonal(
                 name="",
-                df=self.current_source_dataframe,
+                data=self.current_source_dataframe,
                 target=self.current_id,
                 multiplicative=ns_parser.multiplicative,
                 export=ns_parser.export,
@@ -403,10 +405,10 @@ class QaController(StockBaseController):
             default=(max(self.data.values) - min(self.data.values)) / 80,
             help="drift",
         )
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             qa_view.display_cusum(
-                df=self.current_source_dataframe,
+                data=self.current_source_dataframe,
                 target=self.current_id,
                 threshold=ns_parser.threshold,
                 drift=ns_parser.drift,
@@ -431,12 +433,12 @@ class QaController(StockBaseController):
             default=15,
             help="maximum lags to display in plots",
         )
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
 
             qa_view.display_acf(
                 name="",
-                df=self.current_source_dataframe,
+                data=self.current_source_dataframe,
                 target=self.current_id,
                 lags=ns_parser.lags,
             )
@@ -461,13 +463,13 @@ class QaController(StockBaseController):
             default=14,
             help="Window length",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             rolling_view.display_mean_std(
-                name="",
-                df=self.current_source_dataframe,
+                symbol="",
+                data=self.current_source_dataframe,
                 target=self.current_id,
                 window=ns_parser.n_window,
                 export=ns_parser.export,
@@ -492,13 +494,13 @@ class QaController(StockBaseController):
             default=14,
             help="Window length",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             rolling_view.display_spread(
                 name="",
-                df=self.current_source_dataframe,
+                data=self.current_source_dataframe,
                 target=self.current_id,
                 window=ns_parser.n_window,
                 export=ns_parser.export,
@@ -540,13 +542,13 @@ class QaController(StockBaseController):
             default=0.5,
             help="quantile",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             rolling_view.display_quantile(
                 name="",
-                df=self.current_source_dataframe,
+                data=self.current_source_dataframe,
                 target=self.current_id,
                 window=ns_parser.n_window,
                 quantile=ns_parser.f_quantile,
@@ -578,13 +580,13 @@ class QaController(StockBaseController):
             default=14,
             help="window length",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             rolling_view.display_skew(
                 name="",
-                df=self.current_source_dataframe,
+                data=self.current_source_dataframe,
                 target=self.current_id,
                 window=ns_parser.n_window,
                 export=ns_parser.export,
@@ -615,13 +617,13 @@ class QaController(StockBaseController):
             default=14,
             help="window length",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             rolling_view.display_kurtosis(
                 name="",
-                df=self.current_source_dataframe,
+                data=self.current_source_dataframe,
                 target=self.current_id,
                 window=ns_parser.n_window,
                 export=ns_parser.export,
@@ -638,12 +640,12 @@ class QaController(StockBaseController):
                 Normality tests
             """,
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             qa_view.display_normality(
-                df=self.current_source_dataframe,
+                data=self.current_source_dataframe,
                 target=self.current_id,
                 export=ns_parser.export,
             )
@@ -659,10 +661,10 @@ class QaController(StockBaseController):
                 Display QQ plot vs normal quantiles
             """,
         )
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             qa_view.display_qqplot(
-                name="", df=self.current_source_dataframe, target=self.current_id
+                name="", data=self.current_source_dataframe, target=self.current_id
             )
 
     @log_start_end(log=logger)
@@ -694,12 +696,12 @@ class QaController(StockBaseController):
             dest="kpss_reg",
             default="c",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             qa_view.display_unitroot(
-                df=self.current_source_dataframe,
+                data=self.current_source_dataframe,
                 target=self.current_id,
                 fuller_reg=ns_parser.fuller_reg,
                 kpss_reg=ns_parser.kpss_reg,

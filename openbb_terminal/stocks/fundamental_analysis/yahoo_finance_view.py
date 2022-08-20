@@ -20,6 +20,8 @@ from openbb_terminal.helper_funcs import (
     export_data,
     plot_autoscale,
     print_rich_table,
+    is_valid_axes_count,
+    lambda_long_number_format,
 )
 from openbb_terminal.rich_config import console
 from openbb_terminal.stocks.fundamental_analysis import yahoo_finance_model
@@ -28,41 +30,41 @@ logger = logging.getLogger(__name__)
 
 
 @log_start_end(log=logger)
-def open_headquarters_map(ticker: str):
+def open_headquarters_map(symbol: str):
     """Headquarters location of the company
     Parameters
     ----------
-    ticker : str
+    symbol : str
         Fundamental analysis ticker symbol
     """
-    webbrowser.open(yahoo_finance_model.get_hq(ticker))
+    webbrowser.open(yahoo_finance_model.get_hq(symbol))
     console.print("")
 
 
 @log_start_end(log=logger)
-def open_web(ticker: str):
+def open_web(symbol: str):
     """Website of the company
     Parameters
     ----------
-    ticker : str
+    symbol : str
         Fundamental analysis ticker symbol
     """
-    webbrowser.open(yahoo_finance_model.get_website(ticker))
+    webbrowser.open(yahoo_finance_model.get_website(symbol))
     console.print("")
 
 
 @log_start_end(log=logger)
-def display_info(ticker: str, export: str = ""):
+def display_info(symbol: str, export: str = ""):
     """Yahoo Finance ticker info
     Parameters
     ----------
-    ticker : str
+    symbol : str
         Fundamental analysis ticker symbol
     export: str
         Format to export data
     """
     summary = ""
-    df_info = yahoo_finance_model.get_info(ticker)
+    df_info = yahoo_finance_model.get_info(symbol)
     if "Long business summary" in df_info.index:
         summary = df_info.loc["Long business summary"].values[0]
         df_info = df_info.drop(index=["Long business summary"])
@@ -72,7 +74,7 @@ def display_info(ticker: str, export: str = ""):
             df_info,
             headers=list(df_info.columns),
             show_index=True,
-            title=f"{ticker.upper()} Info",
+            title=f"{symbol.upper()} Info",
         )
     else:
         logger.error("Invalid data")
@@ -83,16 +85,15 @@ def display_info(ticker: str, export: str = ""):
         console.print("Business Summary:")
         console.print(summary)
 
-    console.print("")
     export_data(export, os.path.dirname(os.path.abspath(__file__)), "info", df_info)
 
 
 @log_start_end(log=logger)
-def display_shareholders(ticker: str, export: str = ""):
+def display_shareholders(symbol: str, export: str = ""):
     """Yahoo Finance ticker shareholders
     Parameters
     ----------
-    ticker : str
+    symbol : str
         Fundamental analysis ticker symbol
     export: str
         Format to export data
@@ -101,7 +102,7 @@ def display_shareholders(ticker: str, export: str = ""):
         df_major_holders,
         df_institutional_shareholders,
         df_mutualfund_shareholders,
-    ) = yahoo_finance_model.get_shareholders(ticker)
+    ) = yahoo_finance_model.get_shareholders(symbol)
     df_major_holders.columns = ["", ""]
     dfs = [df_major_holders, df_institutional_shareholders, df_mutualfund_shareholders]
     titles = ["Major Holders", "Institutional Holders", "Mutual Fund Holders"]
@@ -116,9 +117,8 @@ def display_shareholders(ticker: str, export: str = ""):
             df,
             headers=list(df.columns),
             show_index=False,
-            title=f"{ticker.upper()} {title}",
+            title=f"{symbol.upper()} {title}",
         )
-        console.print()
 
     export_data(
         export,
@@ -141,20 +141,18 @@ def display_shareholders(ticker: str, export: str = ""):
 
 
 @log_start_end(log=logger)
-def display_sustainability(ticker: str, export: str = ""):
+def display_sustainability(symbol: str, export: str = ""):
     """Yahoo Finance ticker sustainability
 
     Parameters
     ----------
-    other_args : List[str]
-        argparse other args
-    ticker : str
+    symbol : str
         Fundamental analysis ticker symbol
     export: str
         Format to export data
     """
 
-    df_sustainability = yahoo_finance_model.get_sustainability(ticker)
+    df_sustainability = yahoo_finance_model.get_sustainability(symbol)
 
     if df_sustainability.empty:
         console.print("No sustainability data found.", "\n")
@@ -164,10 +162,10 @@ def display_sustainability(ticker: str, export: str = ""):
         print_rich_table(
             df_sustainability,
             headers=list(df_sustainability),
-            title=f"{ticker.upper()} Sustainability",
+            title=f"{symbol.upper()} Sustainability",
             show_index=True,
         )
-        console.print("")
+
     else:
         logger.error("Invalid data")
         console.print("[red]Invalid data[/red]\n")
@@ -178,17 +176,17 @@ def display_sustainability(ticker: str, export: str = ""):
 
 
 @log_start_end(log=logger)
-def display_calendar_earnings(ticker: str, export: str = ""):
+def display_calendar_earnings(symbol: str, export: str = ""):
     """Yahoo Finance ticker calendar earnings
 
     Parameters
     ----------
-    ticker : str
+    symbol : str
         Fundamental analysis ticker symbol
     export: str
         Format to export data
     """
-    df_calendar = yahoo_finance_model.get_calendar_earnings(ticker).T
+    df_calendar = yahoo_finance_model.get_calendar_earnings(symbol).T
     if df_calendar.empty:
         console.print("No calendar events found.\n")
         return
@@ -196,16 +194,15 @@ def display_calendar_earnings(ticker: str, export: str = ""):
         df_calendar,
         show_index=False,
         headers=list(df_calendar.columns),
-        title=f"{ticker.upper()} Calendar Earnings",
+        title=f"{symbol.upper()} Calendar Earnings",
     )
-    console.print("")
 
     export_data(export, os.path.dirname(os.path.abspath(__file__)), "cal", df_calendar)
 
 
 @log_start_end(log=logger)
 def display_dividends(
-    ticker: str,
+    symbol: str,
     limit: int = 12,
     plot: bool = False,
     export: str = "",
@@ -214,8 +211,8 @@ def display_dividends(
     """Display historical dividends
     Parameters
     ----------
-    ticker: str
-        Stock ticker
+    symbol: str
+        Stock ticker symbol
     limit: int
         Number to show
     plot: bool
@@ -225,7 +222,7 @@ def display_dividends(
     external_axes : Optional[List[plt.Axes]], optional
         External axes (1 axis is expected in the list), by default None
     """
-    div_history = yahoo_finance_model.get_dividends(ticker)
+    div_history = yahoo_finance_model.get_dividends(symbol)
     if div_history.empty:
         console.print("No dividends found.\n")
         return
@@ -236,12 +233,10 @@ def display_dividends(
         # This plot has 1 axis
         if not external_axes:
             _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
-        else:
-            if len(external_axes) != 1:
-                logger.error("Expected list of one axis item.")
-                console.print("[red]Expected list of one axis item./n[/red]")
-                return
+        elif is_valid_axes_count(external_axes, 1):
             (ax,) = external_axes
+        else:
+            return
 
         ax.plot(
             div_history.index,
@@ -256,7 +251,7 @@ def display_dividends(
             label="Dividends Payout",
         )
         ax.set_ylabel("Amount ($)")
-        ax.set_title(f"Dividend History for {ticker}")
+        ax.set_title(f"Dividend History for {symbol}")
         ax.set_xlim(div_history.index[-1], div_history.index[0])
         ax.legend()
         theme.style_primary_axis(ax)
@@ -271,16 +266,16 @@ def display_dividends(
         print_rich_table(
             div_history.head(limit),
             headers=["Amount Paid ($)", "Change"],
-            title=f"{ticker.upper()} Historical Dividends",
+            title=f"{symbol.upper()} Historical Dividends",
             show_index=True,
         )
-    console.print()
+
     export_data(export, os.path.dirname(os.path.abspath(__file__)), "divs", div_history)
 
 
 @log_start_end(log=logger)
 def display_splits(
-    ticker: str,
+    symbol: str,
     export: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
 ):
@@ -288,14 +283,14 @@ def display_splits(
 
     Parameters
     ----------
-    ticker: str
-        Stock ticker
+    symbol: str
+        Stock ticker symbol
     export: str
         Format to export data
     external_axes : Optional[List[plt.Axes]], optional
         External axes (1 axis is expected in the list), by default None
     """
-    df_splits = yahoo_finance_model.get_splits(ticker)
+    df_splits = yahoo_finance_model.get_splits(symbol)
     if df_splits.empty:
         console.print("No splits or reverse splits events found.\n")
         return
@@ -303,22 +298,20 @@ def display_splits(
     # This plot has 1 axis
     if not external_axes:
         _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
-    else:
-        if len(external_axes) != 1:
-            logger.error("Expected list of one axis item.")
-            console.print("[red]Expected list of one axis item./n[/red]")
-            return
+    elif is_valid_axes_count(external_axes, 1):
         (ax,) = external_axes
+    else:
+        return
 
     # Get all stock data since IPO
-    df_data = yf.download(ticker, progress=False, threads=False)
+    df_data = yf.download(symbol, progress=False, threads=False)
     if df_data.empty:
         console.print("No stock price data available.\n")
         return
 
     ax.plot(df_data.index, df_data["Adj Close"], color="#FCED00")
     ax.set_ylabel("Price")
-    ax.set_title(f"{ticker} splits and reverse splits events")
+    ax.set_title(f"{symbol} splits and reverse splits events")
 
     ax.plot(df_data.index, df_data["Adj Close"].values)
     for index, row in df_splits.iterrows():
@@ -350,17 +343,17 @@ def display_splits(
 
     print_rich_table(
         df_splits,
-        title=f"{ticker.upper()} splits and reverse splits",
+        title=f"{symbol.upper()} splits and reverse splits",
         show_index=True,
     )
-    console.print()
+
     export_data(export, os.path.dirname(os.path.abspath(__file__)), "splits", df_splits)
 
 
 @log_start_end(log=logger)
 def display_mktcap(
-    ticker: str,
-    start: datetime = (datetime.now() - timedelta(days=3 * 366)),
+    symbol: str,
+    start_date: str = (datetime.now() - timedelta(days=3 * 366)).strftime("%Y-%m-%d"),
     export: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
 ):
@@ -368,16 +361,16 @@ def display_mktcap(
 
     Parameters
     ----------
-    ticker: str
-        Stock ticker
-    start: datetime
+    symbol: str
+        Stock ticker symbol
+    start_date: str
         Start date to display market cap
     export: str
         Format to export data
     external_axes : Optional[List[plt.Axes]], optional
         External axes (1 axis is expected in the list), by default None
     """
-    df_mktcap, currency = yahoo_finance_model.get_mktcap(ticker, start)
+    df_mktcap, currency = yahoo_finance_model.get_mktcap(symbol, start_date)
     if df_mktcap.empty:
         console.print("No Market Cap data available.\n")
         return
@@ -385,16 +378,14 @@ def display_mktcap(
     # This plot has 1 axis
     if not external_axes:
         _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
-    else:
-        if len(external_axes) != 1:
-            logger.error("Expected list of one axis item.")
-            console.print("[red]Expected list of one axis item./n[/red]")
-            return
+    elif is_valid_axes_count(external_axes, 1):
         (ax,) = external_axes
+    else:
+        return
 
     ax.stackplot(df_mktcap.index, df_mktcap.values / 1e9, colors=[theme.up_color])
     ax.set_ylabel(f"Market Cap in Billion ({currency})")
-    ax.set_title(f"{ticker} Market Cap")
+    ax.set_title(f"{symbol} Market Cap")
     ax.set_xlim(df_mktcap.index[0], df_mktcap.index[-1])
     theme.style_primary_axis(ax)
 
@@ -402,3 +393,106 @@ def display_mktcap(
         theme.visualize_output()
 
     export_data(export, os.path.dirname(os.path.abspath(__file__)), "mktcap", df_mktcap)
+
+
+@log_start_end(log=logger)
+def display_fundamentals(
+    symbol: str,
+    statement: str,
+    limit: int = 120,
+    ratios: bool = False,
+    plot: list = None,
+    export: str = "",
+):
+    """Display tickers balance sheet, income statement or cash-flow
+
+    Parameters
+    ----------
+    symbol: str
+        Stock ticker symbol
+    statement: str
+        Either balance or financials for income or cash-flow
+    limit: int
+    ratios: bool
+        Shows percentage change
+    plot: list
+        List of row labels to plot
+    export: str
+        Format to export data
+    """
+    if statement == "balance-sheet":
+        fundamentals = yahoo_finance_model.get_financials(symbol, statement, ratios)
+        title_str = "Balance Sheet"
+    elif statement == "financials":
+        fundamentals = yahoo_finance_model.get_financials(symbol, statement, ratios)
+        title_str = "Income Statement"
+    elif statement == "cash-flow":
+        fundamentals = yahoo_finance_model.get_financials(symbol, statement, ratios)
+        title_str = "Cash Flow Statement"
+
+    if fundamentals.empty:
+        # The empty data frame error handling done in model
+        return
+    if plot:
+        rows_plot = len(plot)
+        fundamentals_plot_data = fundamentals.transpose().fillna(-1)
+        fundamentals_plot_data.columns = fundamentals_plot_data.columns.str.lower()
+        fundamentals_plot_data = fundamentals_plot_data.replace(",", "", regex=True)
+        fundamentals_plot_data = fundamentals_plot_data.replace("-", "-1")
+        fundamentals_plot_data = fundamentals_plot_data.astype(float)
+
+        if not ratios:
+            maximum_value = fundamentals_plot_data.max().max()
+            if maximum_value > 1_000_000_000_000:
+                df_rounded = fundamentals_plot_data / 1_000_000_000_000
+                denomination = " in Trillions"
+            elif maximum_value > 1_000_000_000:
+                df_rounded = fundamentals_plot_data / 1_000_000_000
+                denomination = " in Billions"
+            elif maximum_value > 1_000_000:
+                df_rounded = fundamentals_plot_data / 1_000_000
+                denomination = " in Millions"
+            elif maximum_value > 1_000:
+                df_rounded = fundamentals_plot_data / 1_000
+                denomination = " in Thousands"
+            else:
+                df_rounded = fundamentals_plot_data
+                denomination = ""
+        else:
+            df_rounded = fundamentals_plot_data
+            denomination = ""
+
+        if rows_plot == 1:
+            fig, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
+            df_rounded[plot[0].replace("_", " ")].plot()
+            title = (
+                f"{plot[0].replace('_', ' ').lower()} QoQ Growth of {symbol.upper()}"
+                if ratios
+                else f"{plot[0].replace('_', ' ')} of {symbol.upper()} {denomination}"
+            )
+            plt.title(title)
+            theme.style_primary_axis(ax)
+            theme.visualize_output()
+        else:
+            fig, axes = plt.subplots(rows_plot)
+            for i in range(rows_plot):
+                axes[i].plot(df_rounded[plot[i].replace("_", " ")])
+                axes[i].set_title(f"{plot[i].replace('_', ' ')} {denomination}")
+            theme.style_primary_axis(axes[0])
+            fig.autofmt_xdate()
+    else:
+        # Snake case to english
+        fundamentals.index = fundamentals.index.to_series().apply(
+            lambda x: x.replace("_", " ").title()
+        )
+
+        # Readable numbers
+        fundamentals = fundamentals.applymap(lambda_long_number_format).fillna("-")
+        print_rich_table(
+            fundamentals.iloc[:, :limit].applymap(lambda x: "-" if x == "nan" else x),
+            show_index=True,
+            title=f"{symbol} {title_str}",
+        )
+    export_data(
+        export, os.path.dirname(os.path.abspath(__file__)), statement, fundamentals
+    )

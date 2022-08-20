@@ -10,11 +10,14 @@ import mplfinance as mpf
 import matplotlib.pyplot as plt
 
 from openbb_terminal.decorators import log_start_end
-from openbb_terminal.helper_funcs import export_data, print_rich_table
-from openbb_terminal.rich_config import console
+from openbb_terminal.helper_funcs import (
+    export_data,
+    print_rich_table,
+    is_valid_axes_count,
+)
 from openbb_terminal.stocks.options import chartexchange_model
 from openbb_terminal.config_terminal import theme
-
+from openbb_terminal.rich_config import console
 from openbb_terminal.helper_funcs import (
     plot_autoscale,
     lambda_long_number_format_y_axis,
@@ -24,12 +27,43 @@ logger = logging.getLogger(__name__)
 
 
 @log_start_end(log=logger)
+def plot_chart(
+    df: pd.DataFrame,
+    candle_chart_kwargs: dict,
+    option_type: str,
+    symbol: str,
+    external_axes: Optional[List[plt.Axes]] = None,
+):
+    if not external_axes:
+        candle_chart_kwargs["returnfig"] = True
+        candle_chart_kwargs["figratio"] = (10, 7)
+        candle_chart_kwargs["figscale"] = 1.10
+        candle_chart_kwargs["figsize"] = plot_autoscale()
+        fig, ax = mpf.plot(df, **candle_chart_kwargs)
+        fig.suptitle(
+            f"Historical quotes for {symbol} {option_type}",
+            x=0.055,
+            y=0.965,
+            horizontalalignment="left",
+        )
+        lambda_long_number_format_y_axis(df, "Volume", ax)
+        theme.visualize_output(force_tight_layout=False)
+        ax[0].legend()
+    elif is_valid_axes_count(external_axes, 1):
+        (ax1,) = external_axes
+        candle_chart_kwargs["ax"] = ax1
+        mpf.plot(df, **candle_chart_kwargs)
+    else:
+        return
+
+
+@log_start_end(log=logger)
 def display_raw(
-    ticker: str,
-    date: str,
+    symbol: str,
+    expiry: str,
     call: bool,
-    price: str,
-    num: int = 5,
+    price: float = 0,
+    limit: int = 10,
     export: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
 ) -> None:
@@ -37,21 +71,26 @@ def display_raw(
 
     Parameters
     ----------
-    ticker : str
-        Ticker for the given option
-    date : str
-        Date of expiration for the option
+    symbol : str
+        Ticker symbol for the given option
+    expiry : str
+        The expiry of expiration, format "YYYY-MM-DD", i.e. 2010-12-31.
     call : bool
         Whether the underlying asset should be a call or a put
     price : float
         The strike of the expiration
-    num : int
+    limit : int
         Number of rows to show
     export : str
         Export data as CSV, JSON, XLSX
+    external_axes: Optional[List[plt.Axes]]
+        External axes (1 axis is expected in the list), by default None
     """
 
-    df = chartexchange_model.get_option_history(ticker, date, call, price)[::-1]
+    df = chartexchange_model.get_option_history(symbol, expiry, call, price)[::-1]
+    if df.empty:
+        console.print("[red]No data found[/red]\n")
+        return
     df["Date"] = pd.to_datetime(df["Date"])
     df = df.set_index("Date")
 
@@ -61,41 +100,25 @@ def display_raw(
         "volume": True,
         "xrotation": theme.xticks_rotation,
         "scale_padding": {"left": 0.3, "right": 1, "top": 0.8, "bottom": 0.8},
-        "update_width_config": {
+        "upexpiry_width_config": {
             "candle_linewidth": 0.6,
             "candle_width": 0.8,
             "volume_linewidth": 0.8,
             "volume_width": 0.8,
         },
         "warn_too_much_data": 10000,
-        "datetime_format": "%Y-%b-%d",
+        "expirytime_format": "%Y-%b-%d",
     }
     # This plot has 2 axes
     option_type = "call" if call else "put"
 
-    if not external_axes:
-        candle_chart_kwargs["returnfig"] = True
-        candle_chart_kwargs["figratio"] = (10, 7)
-        candle_chart_kwargs["figscale"] = 1.10
-        candle_chart_kwargs["figsize"] = plot_autoscale()
-        fig, ax = mpf.plot(df, **candle_chart_kwargs)
-        fig.suptitle(
-            f"Historical quotes for {ticker} {option_type}",
-            x=0.055,
-            y=0.965,
-            horizontalalignment="left",
-        )
-        lambda_long_number_format_y_axis(df, "Volume", ax)
-        theme.visualize_output(force_tight_layout=False)
-        ax[0].legend()
-    else:
-        if len(external_axes) != 1:
-            logger.error("Expected list of 1 axis items.")
-            console.print("[red]Expected list of 1 axis items./n[/red]")
-            return
-        (ax1,) = external_axes
-        candle_chart_kwargs["ax"] = ax1
-        mpf.plot(df, **candle_chart_kwargs)
+    plot_chart(
+        df=df,
+        candle_chart_kwargs=candle_chart_kwargs,
+        option_type=option_type,
+        symbol=symbol,
+        external_axes=external_axes,
+    )
 
     export_data(
         export,
@@ -104,10 +127,8 @@ def display_raw(
         df,
     )
     print_rich_table(
-        df.head(num),
+        df.head(limit),
         headers=list(df.columns),
         show_index=True,
-        title=f"{ticker.upper()} raw data",
+        title=f"{symbol.upper()} raw data",
     )
-
-    console.print()

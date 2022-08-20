@@ -52,9 +52,12 @@ def _make_request(url: str) -> Optional[dict]:
         dictionary with response data
     """
 
-    response = requests.get(
-        url, headers={"Accept": "application/json", "User-Agent": get_user_agent()}
-    )
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": get_user_agent(),
+        "referer": "https://dappradar.com/",
+    }
+    response = requests.get(url, headers=headers)
     if not 200 <= response.status_code < 300:
         console.print(f"[red]dappradar api exception: {response.text}[/red]")
         return None
@@ -67,20 +70,23 @@ def _make_request(url: str) -> Optional[dict]:
 
 
 @log_start_end(log=logger)
-def get_top_nfts() -> pd.DataFrame:
+def get_top_nfts(sortby: str = "") -> pd.DataFrame:
     """Get top nft collections [Source: https://dappradar.com/]
 
     Parameters
     ----------
+    sortby: str
+        Key by which to sort data
 
     Returns
     -------
     pd.DataFrame
-        NFT collections. Columns: Name, Protocols, Floor Price [$], Avg Price [$], Market Cap [$], Volume [$]
+        NFTs Columns: Name, Protocols, Floor Price [$], Avg Price [$], Market Cap [$], Volume [$]
     """
 
     response = _make_request(
-        "https://nft-sales-service.dappradar.com/v2/collection/day?limit=20&page=1&currency=USD&sort=marketCapInFiat&order=desc"  # noqa
+        "https://nft-sales-service.dappradar.com/v2/collection/day?limit=20&p"
+        "age=1&currency=USD&sort=marketCapInFiat&order=desc"
     )
     if response:
         data = response.get("results")
@@ -103,15 +109,19 @@ def get_top_nfts() -> pd.DataFrame:
         )
         df["Protocols"] = df["Protocols"].apply(lambda x: ",".join(x))
         return df
+    if sortby in NFT_COLUMNS:
+        df = df.sort_values(by=sortby, ascending=False)
     return pd.DataFrame()
 
 
 @log_start_end(log=logger)
-def get_top_dexes() -> pd.DataFrame:
+def get_top_dexes(sortby: str = "") -> pd.DataFrame:
     """Get top dexes by daily volume and users [Source: https://dappradar.com/]
 
     Parameters
     ----------
+    sortby: str
+        Key by which to sort data
 
     Returns
     -------
@@ -119,7 +129,9 @@ def get_top_dexes() -> pd.DataFrame:
         Top decentralized exchanges. Columns: Name, Daily Users, Daily Volume [$]
     """
     data = _make_request(
-        "https://dappradar.com/v2/api/dapps?params=WkdGd2NISmhaR0Z5Y0dGblpUMHhKbk5uY205MWNEMXRZWGdtWTNWeWNtVnVZM2s5VlZORUptWmxZWFIxY21Wa1BURW1jbUZ1WjJVOVpHRjVKbU5oZEdWbmIzSjVQV1Y0WTJoaGJtZGxjeVp6YjNKMFBYUnZkR0ZzVm05c2RXMWxTVzVHYVdGMEptOXlaR1Z5UFdSbGMyTW1iR2x0YVhROU1qWT0="  # noqa
+        "https://dappradar.com/v2/api/dapps?params=WkdGd2NISmhaR0Z5Y0dGblpUMHhKbk5uY205MWNEMXR"
+        "ZWGdtWTNWeWNtVnVZM2s5VlZORUptWmxZWFIxY21Wa1BURW1jbUZ1WjJVOVpHRjVKbU5oZEdWbmIzSjVQV1Y0WTJ"
+        "oaGJtZGxjeVp6YjNKMFBYUnZkR0ZzVm05c2RXMWxTVzVHYVdGMEptOXlaR1Z5UFdSbGMyTW1iR2x0YVhROU1qWT0="
     )
     if data:
         arr = []
@@ -132,6 +144,8 @@ def get_top_dexes() -> pd.DataFrame:
                 ]
             )
         df = pd.DataFrame(arr, columns=DEX_COLUMNS)
+        if sortby in DEX_COLUMNS:
+            df = df.sort_values(by=sortby, ascending=False)
         return df
     return pd.DataFrame()
 
@@ -149,7 +163,9 @@ def get_top_games() -> pd.DataFrame:
         Top blockchain games. Columns: Name, Daily Users, Daily Volume [$]
     """
     data = _make_request(
-        "https://dappradar.com/v2/api/dapps?params=WkdGd2NISmhaR0Z5Y0dGblpUMHhKbk5uY205MWNEMXRZWGdtWTNWeWNtVnVZM2s5VlZORUptWmxZWFIxY21Wa1BURW1jbUZ1WjJVOVpHRjVKbU5oZEdWbmIzSjVQV2RoYldWekpuTnZjblE5ZFhObGNpWnZjbVJsY2oxa1pYTmpKbXhwYldsMFBUSTI="  # noqa
+        "https://dappradar.com/v2/api/dapps?params=WkdGd2NISmhaR0Z5Y0dGblpUMHhKbk5uY205MWNEMX"
+        "RZWGdtWTNWeWNtVnVZM2s5VlZORUptWmxZWFIxY21Wa1BURW1jbUZ1WjJVOVpHRjVKbU5oZEdWbmIzSjVQV2R"
+        "oYldWekpuTnZjblE5ZFhObGNpWnZjbVJsY2oxa1pYTmpKbXhwYldsMFBUSTI="
     )
     if data:
         arr = []
@@ -170,19 +186,24 @@ def get_top_games() -> pd.DataFrame:
 
 
 @log_start_end(log=logger)
-def get_top_dapps() -> pd.DataFrame:
+def get_top_dapps(sortby: str = "") -> pd.DataFrame:
     """Get top decentralized applications by daily volume and users [Source: https://dappradar.com/]
 
     Parameters
     ----------
+    sortby: str
+        Key by which to sort data
 
     Returns
     -------
     pd.DataFrame
-        Top decentralized exchanges. Columns: Name, Category, Protocols, Daily Users, Daily Volume [$]
+        Top decentralized exchanges.
+        Columns: Name, Category, Protocols, Daily Users, Daily Volume [$]
     """
     data = _make_request(
-        "https://dappradar.com/v2/api/dapps?params=WkdGd2NISmhaR0Z5Y0dGblpUMHhKbk5uY205MWNEMXRZWGdtWTNWeWNtVnVZM2s5VlZORUptWmxZWFIxY21Wa1BURW1jbUZ1WjJVOVpHRjVKbk52Y25ROWRYTmxjaVp2Y21SbGNqMWtaWE5qSm14cGJXbDBQVEky"  # noqa
+        "https://dappradar.com/v2/api/dapps?params=WkdGd2NISmhaR0Z5Y0dGblpUMHhKbk5uY205MWNEMX"
+        "RZWGdtWTNWeWNtVnVZM2s5VlZORUptWmxZWFIxY21Wa1BURW1jbUZ1WjJVOVpHRjVKbk52Y25ROWRYTmxjaVp"
+        "2Y21SbGNqMWtaWE5qSm14cGJXbDBQVEky"
     )
     if data:
         arr = []
@@ -201,5 +222,7 @@ def get_top_dapps() -> pd.DataFrame:
             columns=DAPPS_COLUMNS,
         ).sort_values("Daily Users", ascending=False)
         df["Protocols"] = df["Protocols"].apply(lambda x: ",".join(x))
+        if sortby in DAPPS_COLUMNS:
+            df = df.sort_values(by=sortby, ascending=False)
         return df
     return pd.DataFrame()

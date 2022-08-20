@@ -23,6 +23,7 @@ from openbb_terminal.helper_funcs import (
     get_next_stock_market_days,
     plot_autoscale,
     print_rich_table,
+    is_valid_axes_count,
 )
 from openbb_terminal.rich_config import console
 from openbb_terminal import rich_config
@@ -46,7 +47,7 @@ def display_arima(
     seasonal: bool,
     ic: str,
     results: bool,
-    s_end_date: str = "",
+    end_date: str = "",
     export: str = "",
     time_res: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
@@ -69,7 +70,7 @@ def display_arima(
         Information Criteria for model evaluation
     results : bool
         Flag to display model summary
-    s_end_date : str, optional
+    end_date : str, optional
         Specified end date for backtesting comparisons
     export : str, optional
         Format to export image
@@ -81,14 +82,14 @@ def display_arima(
 
     if arima_order:
         t_order = tuple(int(ord) for ord in arima_order.split(","))
-    if s_end_date:
+    if end_date:
         if not time_res:
             future_index = get_next_stock_market_days(
-                last_stock_day=s_end_date, n_next_days=n_predict
+                last_stock_day=end_date, n_next_days=n_predict
             )
         else:
             future_index = pd.date_range(
-                s_end_date, periods=n_predict + 1, freq=time_res
+                end_date, periods=n_predict + 1, freq=time_res
             )[1:]
 
         if future_index[-1] > datetime.datetime.now():
@@ -98,7 +99,7 @@ def display_arima(
             return
 
         df_future = values[future_index[0] : future_index[-1]]  # noqa: E203
-        values = values[:s_end_date]  # type: ignore
+        values = values[:end_date]  # type: ignore
 
     l_predictions, model = arima_model.get_arima_model(
         values, arima_order, n_predict, seasonal, ic
@@ -121,21 +122,24 @@ def display_arima(
         console.print(model.summary())
         console.print("")
 
-    # This plot has 1 axes
+    # This plot has 1 axis
     if external_axes is None:
         _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
+    elif end_date and not is_valid_axes_count(
+        external_axes,
+        3,
+        prefix_text="If there is end_date",
+        suffix_text="when backtesting",
+    ):
+        return
+    elif not end_date and not is_valid_axes_count(
+        external_axes,
+        1,
+        prefix_text="If there is no end_date",
+        suffix_text="when backtesting",
+    ):
+        return
     else:
-        if (not s_end_date and len(external_axes) != 1) or (
-            s_end_date and len(external_axes) != 3
-        ):
-            logger.error(
-                "Expected list of 1 axis item or 3 axis items when backtesting"
-            )
-            console.print(
-                "[red]Expected list of 1 axis item "
-                + "or 3 axis items when backtesting./n[/red]"
-            )
-            return
         ax = external_axes[0]
 
     ax.plot(values.index, values)
@@ -144,7 +148,7 @@ def display_arima(
 
     if arima_order:
         # BACKTESTING
-        if s_end_date:
+        if end_date:
             ax.set_title(
                 f"BACKTESTING: ARIMA {str(t_order)} on {dataset} - {n_predict} step prediction"
             )
@@ -154,7 +158,7 @@ def display_arima(
             )
     else:
         # BACKTESTING
-        if s_end_date:
+        if end_date:
             ax.set_title(
                 f"BACKTESTING: ARIMA {model.order} on {dataset} - {n_predict} step prediction"
             )
@@ -174,7 +178,7 @@ def display_arima(
     ax.vlines(values.index[-1], ymin, ymax, linestyle="--")
 
     # BACKTESTING
-    if s_end_date:
+    if end_date:
         ax.plot(
             df_future.index,
             df_future,
@@ -197,19 +201,17 @@ def display_arima(
         theme.visualize_output()
 
     # BACKTESTING
-    if s_end_date:
-        # This plot has 1 axes
+    if end_date:
+        # This plot has 3 axes
         if external_axes is None:
             _, axes = plt.subplots(
                 2, 1, sharex=True, figsize=plot_autoscale(), dpi=PLOT_DPI
             )
             (ax2, ax3) = axes
-        else:
-            if len(external_axes) != 3:
-                logger.error("Expected list of one axis item.")
-                console.print("[red]Expected list of 1 axis item./n[/red]")
-                return
+        elif is_valid_axes_count(external_axes, 3):
             (_, ax2, ax3) = external_axes
+        else:
+            return
 
         ax2.plot(
             df_future.index,
@@ -305,11 +307,10 @@ def display_arima(
                 title="ARIMA Model",
             )
 
-        console.print("")
         print_prediction_kpis(df_pred["Real"].values, df_pred["Prediction"].values)
 
     else:
         # Print prediction data
         print_pretty_prediction(df_pred, values.values[-1])
+
     export_data(export, os.path.dirname(os.path.abspath(__file__)), "arima")
-    console.print("")

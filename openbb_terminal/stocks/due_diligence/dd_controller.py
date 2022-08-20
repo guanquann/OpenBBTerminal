@@ -14,11 +14,10 @@ from openbb_terminal.helper_funcs import (
     EXPORT_BOTH_RAW_DATA_AND_FIGURES,
     EXPORT_ONLY_RAW_DATA_ALLOWED,
     check_positive,
-    parse_known_args_and_warn,
 )
 from openbb_terminal.menu import session
 from openbb_terminal.parent_classes import StockBaseController
-from openbb_terminal.rich_config import console
+from openbb_terminal.rich_config import console, MenuText
 from openbb_terminal.stocks import stocks_helper
 from openbb_terminal.stocks.due_diligence import (
     ark_view,
@@ -74,27 +73,21 @@ class DueDiligenceController(StockBaseController):
 
     def print_help(self):
         """Print help"""
-        help_text = f"""
-[param]Ticker: [/param]{self.ticker}[cmds]
-
-[src][Finviz][/src]
-    analyst       analyst prices and ratings of the company
-[src][FMP][/src]
-    rating        rating over time (daily)
-[src][Finnhub][/src]
-    rot           number of analysts ratings over time (monthly)
-[src][Business Insider][/src]
-    pt            price targets over time
-    est           quarter and year analysts earnings estimates
-[src][Market Watch][/src]
-    sec           SEC filings
-[src][Csimarket][/src]
-    supplier      list of suppliers
-    customer      list of customers
-[src][Cathiesark.com][/src]
-    arktrades     get ARK trades for ticker[/cmds]
-        """
-        console.print(text=help_text, menu="Stocks - Due Diligence")
+        mt = MenuText("stocks/dd/", 90)
+        mt.add_cmd("load")
+        mt.add_raw("\n")
+        mt.add_param("_ticker", self.ticker.upper())
+        mt.add_raw("\n")
+        mt.add_cmd("analyst", "Finviz")
+        mt.add_cmd("rating", "FMP")
+        mt.add_cmd("rot", "Finnhub")
+        mt.add_cmd("pt", "Business Insider")
+        mt.add_cmd("est", "Business Insider")
+        mt.add_cmd("sec", "Market Watch")
+        mt.add_cmd("supplier", "Csimarket")
+        mt.add_cmd("customer", "Csimarket")
+        mt.add_cmd("arktrades", "Cathiesark")
+        console.print(text=mt.menu_text, menu="Stocks - Due Diligence")
 
     def custom_reset(self) -> List[str]:
         """Class specific component of reset command"""
@@ -114,11 +107,11 @@ class DueDiligenceController(StockBaseController):
             """,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
-            finviz_view.analyst(ticker=self.ticker, export=ns_parser.export)
+            finviz_view.analyst(symbol=self.ticker, export=ns_parser.export)
 
     @log_start_end(log=logger)
     def call_pt(self, other_args: List[str]):
@@ -146,16 +139,15 @@ class DueDiligenceController(StockBaseController):
 
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             business_insider_view.price_target_from_analysts(
-                ticker=self.ticker,
-                start=self.start,
-                interval=self.interval,
-                stock=self.stock,
-                num=ns_parser.limit,
+                symbol=self.ticker,
+                data=self.stock,
+                start_date=self.start,
+                limit=ns_parser.limit,
                 raw=ns_parser.raw,
                 export=ns_parser.export,
             )
@@ -166,15 +158,16 @@ class DueDiligenceController(StockBaseController):
         parser = argparse.ArgumentParser(
             add_help=False,
             prog="est",
-            description="""Yearly estimates and quarter earnings/revenues. [Source: Business Insider]""",
+            description="""Yearly estimates and quarter earnings/revenues.
+            [Source: Business Insider]""",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             business_insider_view.estimates(
-                ticker=self.ticker,
+                symbol=self.ticker,
                 export=ns_parser.export,
             )
 
@@ -207,13 +200,13 @@ class DueDiligenceController(StockBaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             finnhub_view.rating_over_time(
-                ticker=self.ticker,
-                num=ns_parser.limit,
+                symbol=self.ticker,
+                limit=ns_parser.limit,
                 raw=ns_parser.raw,
                 export=ns_parser.export,
             )
@@ -243,13 +236,13 @@ class DueDiligenceController(StockBaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             fmp_view.rating(
-                ticker=self.ticker,
-                num=ns_parser.limit,
+                symbol=self.ticker,
+                limit=ns_parser.limit,
                 export=ns_parser.export,
             )
 
@@ -277,13 +270,13 @@ class DueDiligenceController(StockBaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             marketwatch_view.sec_filings(
-                ticker=self.ticker,
-                num=ns_parser.limit,
+                symbol=self.ticker,
+                limit=ns_parser.limit,
                 export=ns_parser.export,
             )
 
@@ -296,12 +289,12 @@ class DueDiligenceController(StockBaseController):
             description="List of suppliers from ticker provided. [Source: CSIMarket]",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             csimarket_view.suppliers(
-                ticker=self.ticker,
+                symbol=self.ticker,
                 export=ns_parser.export,
             )
 
@@ -314,12 +307,12 @@ class DueDiligenceController(StockBaseController):
             description="List of customers from ticker provided. [Source: CSIMarket]",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             csimarket_view.customers(
-                ticker=self.ticker,
+                symbol=self.ticker,
                 export=ns_parser.export,
             )
 
@@ -343,21 +336,21 @@ class DueDiligenceController(StockBaseController):
         )
         parser.add_argument(
             "-s",
-            "--show_ticker",
+            "--show_symbol",
             action="store_true",
             default=False,
             help="Flag to show ticker in table",
-            dest="show_ticker",
+            dest="show_symbol",
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             ark_view.display_ark_trades(
-                ticker=self.ticker,
-                num=ns_parser.limit,
+                symbol=self.ticker,
+                limit=ns_parser.limit,
+                show_symbol=ns_parser.show_symbol,
                 export=ns_parser.export,
-                show_ticker=ns_parser.show_ticker,
             )

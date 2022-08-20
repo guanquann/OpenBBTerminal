@@ -129,6 +129,13 @@ opt_chain_cols = {
 }
 
 
+# pylint: disable=R0903
+class Chain:
+    def __init__(self, df: pd.DataFrame):
+        self.calls = df[df["option_type"] == "call"]
+        self.puts = df[df["option_type"] == "put"]
+
+
 class Option:
     def __init__(
         self,
@@ -204,7 +211,7 @@ class Option:
     # 1st order greeks
 
     def Delta(self):
-        dfq = e ** (-self.div_cont * self.exp_time)
+        dfq = np.exp(-self.div_cont * self.exp_time)
         if self.Type == 1:
             return dfq * norm.cdf(self.d1)
         return dfq * (norm.cdf(self.d1) - 1)
@@ -214,15 +221,15 @@ class Option:
         return (
             0.01
             * self.price
-            * e ** (-self.div_cont * self.exp_time)
+            * np.exp(-self.div_cont * self.exp_time)
             * norm.pdf(self.d1)
             * self.exp_time**0.5
         )
 
     def Theta(self):
         """Theta for 1 day change"""
-        df = e ** -(self.risk_free * self.exp_time)
-        dfq = e ** (-self.div_cont * self.exp_time)
+        df = np.exp(-self.risk_free * self.exp_time)
+        dfq = np.exp(-self.div_cont * self.exp_time)
         tmptheta = (1.0 / 365.0) * (
             -0.5
             * self.price

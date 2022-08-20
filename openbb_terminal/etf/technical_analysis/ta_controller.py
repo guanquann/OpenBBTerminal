@@ -27,12 +27,11 @@ from openbb_terminal.helper_funcs import (
     EXPORT_BOTH_RAW_DATA_AND_FIGURES,
     check_positive,
     check_positive_list,
-    parse_known_args_and_warn,
     valid_date,
 )
 from openbb_terminal.menu import session
 from openbb_terminal.parent_classes import BaseController
-from openbb_terminal.rich_config import console
+from openbb_terminal.rich_config import console, MenuText
 
 logger = logging.getLogger(__name__)
 
@@ -82,41 +81,45 @@ class TechnicalAnalysisController(BaseController):
 
         if session and obbff.USE_PROMPT_TOOLKIT:
             choices: dict = {c: {} for c in self.controller_choices}
+
+            choices["support"] = self.SUPPORT_CHOICES
+            choices["about"] = self.ABOUT_CHOICES
+
             self.completer = NestedCompleter.from_nested_dict(choices)
 
     def print_help(self):
         """Print help"""
-        help_text = f"""
-[param]ETF: [/param]{self.ticker}[cmds]
-
-[info]Overlap:[/info]
-    ema         exponential moving average
-    sma         simple moving average
-    wma         weighted moving average
-    hma         hull moving average
-    zlma        zero lag moving average
-[info]Momentum:[/info]
-    cci         commodity channel index
-    macd        moving average convergence/divergence
-    rsi         relative strength index
-    stoch       stochastic oscillator
-    fisher      fisher transform
-    cg          centre of gravity
-[info]Trend:[/info]
-    adx         average directional movement index
-    aroon       aroon indicator
-[info]Volatility:[/info]
-    bbands      bollinger bands
-    donchian    donchian channels
-    kc          keltner channels
-[info]Volume:[/info]
-    ad          accumulation/distribution line
-    adosc       chaikin oscillator
-    obv         on balance volume
-[info]Custom:[/info]
-    fib         fibonacci retracement[/cmds]
-"""
-        console.print(text=help_text, menu="ETF - Technical Analysis")
+        mt = MenuText("etf/ta/", 90)
+        mt.add_param("_ticker", self.ticker)
+        mt.add_raw("\n")
+        mt.add_info("_overlap_")
+        mt.add_cmd("ema")
+        mt.add_cmd("sma")
+        mt.add_cmd("wma")
+        mt.add_cmd("hma")
+        mt.add_cmd("zlma")
+        mt.add_cmd("vwap")
+        mt.add_info("_momentum_")
+        mt.add_cmd("cci")
+        mt.add_cmd("macd")
+        mt.add_cmd("rsi")
+        mt.add_cmd("stoch")
+        mt.add_cmd("fisher")
+        mt.add_cmd("cg")
+        mt.add_info("_trend_")
+        mt.add_cmd("adx")
+        mt.add_cmd("aroon")
+        mt.add_info("_volatility_")
+        mt.add_cmd("bbands")
+        mt.add_cmd("donchian")
+        mt.add_cmd("kc")
+        mt.add_info("_volume_")
+        mt.add_cmd("ad")
+        mt.add_cmd("adosc")
+        mt.add_cmd("obv")
+        mt.add_info("_custom_")
+        mt.add_cmd("fib")
+        console.print(text=mt.menu_text, menu="ETF - Technical Analysis")
 
     def custom_reset(self):
         """Class specific component of reset command"""
@@ -164,15 +167,15 @@ class TechnicalAnalysisController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             overlap_view.view_ma(
                 ma_type="EMA",
-                s_ticker=self.ticker,
+                symbol=self.ticker,
                 series=self.data["Adj Close"],
-                length=ns_parser.n_length,
+                window=ns_parser.n_length,
                 offset=ns_parser.n_offset,
                 export=ns_parser.export,
             )
@@ -216,15 +219,15 @@ class TechnicalAnalysisController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             overlap_view.view_ma(
                 ma_type="SMA",
-                s_ticker=self.ticker,
+                symbol=self.ticker,
                 series=self.data["Adj Close"],
-                length=ns_parser.n_length,
+                window=ns_parser.n_length,
                 offset=ns_parser.n_offset,
                 export=ns_parser.export,
             )
@@ -265,15 +268,15 @@ class TechnicalAnalysisController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             overlap_view.view_ma(
                 ma_type="WMA",
-                s_ticker=self.ticker,
+                symbol=self.ticker,
                 series=self.data["Adj Close"],
-                length=ns_parser.n_length,
+                window=ns_parser.n_length,
                 offset=ns_parser.n_offset,
                 export=ns_parser.export,
             )
@@ -314,15 +317,15 @@ class TechnicalAnalysisController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             overlap_view.view_ma(
                 ma_type="HMA",
-                s_ticker=self.ticker,
+                symbol=self.ticker,
                 series=self.data["Adj Close"],
-                length=ns_parser.n_length,
+                window=ns_parser.n_length,
                 offset=ns_parser.n_offset,
                 export=ns_parser.export,
             )
@@ -366,15 +369,15 @@ class TechnicalAnalysisController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             overlap_view.view_ma(
                 ma_type="ZLMA",
-                s_ticker=self.ticker,
+                symbol=self.ticker,
                 series=self.data["Adj Close"],
-                length=ns_parser.n_length,
+                window=ns_parser.n_length,
                 offset=ns_parser.n_offset,
                 export=ns_parser.export,
             )
@@ -415,14 +418,14 @@ class TechnicalAnalysisController(BaseController):
             help="scalar",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             momentum_view.display_cci(
-                s_ticker=self.ticker,
-                ohlc=self.data,
-                length=ns_parser.n_length,
+                symbol=self.ticker,
+                data=self.data,
+                window=ns_parser.n_length,
                 scalar=ns_parser.n_scalar,
                 export=ns_parser.export,
             )
@@ -447,7 +450,6 @@ class TechnicalAnalysisController(BaseController):
             """,
         )
         parser.add_argument(
-            "-f",
             "--fast",
             action="store",
             dest="n_fast",
@@ -456,7 +458,6 @@ class TechnicalAnalysisController(BaseController):
             help="The short period.",
         )
         parser.add_argument(
-            "-s",
             "--slow",
             action="store",
             dest="n_slow",
@@ -473,12 +474,12 @@ class TechnicalAnalysisController(BaseController):
             help="The signal period.",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             momentum_view.display_macd(
-                s_ticker=self.ticker,
+                symbol=self.ticker,
                 series=self.data["Adj Close"],
                 n_fast=ns_parser.n_fast,
                 n_slow=ns_parser.n_slow,
@@ -533,14 +534,14 @@ class TechnicalAnalysisController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             momentum_view.display_rsi(
-                s_ticker=self.ticker,
+                symbol=self.ticker,
                 series=self.data["Adj Close"],
-                length=ns_parser.n_length,
+                window=ns_parser.n_length,
                 scalar=ns_parser.n_scalar,
                 drift=ns_parser.n_drift,
                 export=ns_parser.export,
@@ -589,13 +590,13 @@ class TechnicalAnalysisController(BaseController):
             help="The time period of the slowk moving average",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             momentum_view.display_stoch(
-                s_ticker=self.ticker,
-                ohlc=self.data,
+                symbol=self.ticker,
+                data=self.data,
                 fastkperiod=ns_parser.n_fastkperiod,
                 slowdperiod=ns_parser.n_slowdperiod,
                 slowkperiod=ns_parser.n_slowkperiod,
@@ -630,14 +631,14 @@ class TechnicalAnalysisController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             momentum_view.display_fisher(
-                s_ticker=self.ticker,
-                ohlc=self.data,
-                length=ns_parser.n_length,
+                symbol=self.ticker,
+                data=self.data,
+                window=ns_parser.n_length,
                 export=ns_parser.export,
             )
 
@@ -669,14 +670,14 @@ class TechnicalAnalysisController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             momentum_view.display_cg(
-                s_ticker=self.ticker,
+                symbol=self.ticker,
                 series=self.data["Adj Close"],
-                length=ns_parser.n_length,
+                window=ns_parser.n_length,
                 export=ns_parser.export,
             )
 
@@ -724,14 +725,14 @@ class TechnicalAnalysisController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             trend_indicators_view.display_adx(
-                s_ticker=self.ticker,
-                ohlc=self.data,
-                length=ns_parser.n_length,
+                symbol=self.ticker,
+                data=self.data,
+                window=ns_parser.n_length,
                 scalar=ns_parser.n_scalar,
                 drift=ns_parser.n_drift,
                 export=ns_parser.export,
@@ -780,14 +781,14 @@ class TechnicalAnalysisController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             trend_indicators_view.display_aroon(
-                s_ticker=self.ticker,
-                ohlc=self.data,
-                length=ns_parser.n_length,
+                symbol=self.ticker,
+                data=self.data,
+                window=ns_parser.n_length,
                 scalar=ns_parser.n_scalar,
                 export=ns_parser.export,
             )
@@ -843,14 +844,14 @@ class TechnicalAnalysisController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             volatility_view.display_bbands(
-                ticker=self.ticker,
-                ohlc=self.data,
-                length=ns_parser.n_length,
+                symbol=self.ticker,
+                data=self.data,
+                window=ns_parser.n_length,
                 n_std=ns_parser.n_std,
                 mamode=ns_parser.s_mamode,
                 export=ns_parser.export,
@@ -891,13 +892,13 @@ class TechnicalAnalysisController(BaseController):
             help="length",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             volatility_view.display_donchian(
-                ticker=self.ticker,
-                ohlc=self.data,
+                symbol=self.ticker,
+                data=self.data,
                 upper_length=ns_parser.n_length_upper,
                 lower_length=ns_parser.n_length_lower,
                 export=ns_parser.export,
@@ -958,14 +959,14 @@ class TechnicalAnalysisController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             volatility_view.view_kc(
-                s_ticker=self.ticker,
-                ohlc=self.data,
-                length=ns_parser.n_length,
+                symbol=self.ticker,
+                data=self.data,
+                window=ns_parser.n_length,
                 scalar=ns_parser.n_scalar,
                 mamode=ns_parser.s_mamode,
                 offset=ns_parser.n_offset,
@@ -1000,13 +1001,13 @@ class TechnicalAnalysisController(BaseController):
             help="uses open value of stock",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             volume_view.display_ad(
-                s_ticker=self.ticker,
-                ohlc=self.data,
+                symbol=self.ticker,
+                data=self.data,
                 use_open=ns_parser.b_use_open,
                 export=ns_parser.export,
             )
@@ -1036,8 +1037,7 @@ class TechnicalAnalysisController(BaseController):
             help="uses open value of stock",
         )
         parser.add_argument(
-            "-f",
-            "--fast_length",
+            "--fast",
             action="store",
             dest="n_length_fast",
             type=check_positive,
@@ -1045,8 +1045,7 @@ class TechnicalAnalysisController(BaseController):
             help="fast length",
         )
         parser.add_argument(
-            "-s",
-            "--slow_length",
+            "--slow",
             action="store",
             dest="n_length_slow",
             type=check_positive,
@@ -1054,13 +1053,13 @@ class TechnicalAnalysisController(BaseController):
             help="slow length",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             volume_view.display_adosc(
-                s_ticker=self.ticker,
-                ohlc=self.data,
+                symbol=self.ticker,
+                data=self.data,
                 use_open=ns_parser.b_use_open,
                 fast=ns_parser.n_length_fast,
                 slow=ns_parser.n_length_slow,
@@ -1085,13 +1084,13 @@ class TechnicalAnalysisController(BaseController):
             """,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             volume_view.display_obv(
-                s_ticker=self.ticker,
-                ohlc=self.data,
+                symbol=self.ticker,
+                data=self.data,
                 export=ns_parser.export,
             )
 
@@ -1109,7 +1108,7 @@ class TechnicalAnalysisController(BaseController):
             "--period",
             dest="period",
             type=int,
-            help="Days to lookback for retracement",
+            help="Days to look back for retracement",
             default=120,
         )
         parser.add_argument(
@@ -1130,13 +1129,13 @@ class TechnicalAnalysisController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-p")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             custom_indicators_view.fibonacci_retracement(
-                s_ticker=self.ticker,
-                ohlc=self.data,
+                symbol=self.ticker,
+                data=self.data,
                 period=ns_parser.period,
                 start_date=ns_parser.start,
                 end_date=ns_parser.end,

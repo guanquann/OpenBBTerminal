@@ -18,13 +18,11 @@ from openbb_terminal.helper_funcs import (
     EXPORT_ONLY_RAW_DATA_ALLOWED,
     check_non_negative,
     check_positive,
-    parse_known_args_and_warn,
     valid_date,
 )
 from openbb_terminal.menu import session
 from openbb_terminal.parent_classes import BaseController
-from openbb_terminal.portfolio.portfolio_optimization import po_controller
-from openbb_terminal.rich_config import console
+from openbb_terminal.rich_config import console, MenuText
 from openbb_terminal.stocks.comparison_analysis import (
     finbrain_view,
     finnhub_model,
@@ -32,7 +30,6 @@ from openbb_terminal.stocks.comparison_analysis import (
     finviz_compare_view,
     marketwatch_view,
     polygon_model,
-    yahoo_finance_model,
     yahoo_finance_view,
 )
 
@@ -73,9 +70,7 @@ class ComparisonAnalysisController(BaseController):
         "technical",
         "tsne",
     ]
-    CHOICES_MENUS = [
-        "po",
-    ]
+    CHOICES_MENUS: List = list()
     PATH = "/stocks/ca/"
 
     def __init__(self, similar: List[str] = None, queue: List[str] = None):
@@ -98,50 +93,39 @@ class ComparisonAnalysisController(BaseController):
 
     def print_help(self):
         """Print help"""
-        has_ticker_start = "" if self.ticker else "[unvl]"
-        has_ticker_end = "" if self.ticker else "[/unvl]"
-
-        has_similar_start = "" if self.similar and len(self.similar) > 1 else "[unvl]"
-        has_similar_end = "" if self.similar and len(self.similar) > 1 else "[/unvl]"
-
-        help_text = f"""[cmds]
-    ticker        set ticker to get similar companies from[/cmds]
-
-[param]Ticker to get similar companies from: [/param]{self.ticker}
-[cmds]{has_ticker_start}
-    tsne          run TSNE on all SP500 stocks and returns closest tickers
-    getpoly       get similar stocks from polygon API
-    getfinnhub    get similar stocks from finnhub API
-    getfinviz     get similar stocks from finviz API{has_ticker_end}
-
-    set           reset and set similar companies
-    add           add more similar companies
-    rmv           remove similar companies individually or all[/cmds]
-{has_similar_start}
-[param]Similar Companies: [/param]{', '.join(self.similar) if self.similar else ''}
-
-[src][Yahoo Finance][/src]
-    historical    historical price data comparison
-    hcorr         historical price correlation
-    volume        historical volume data comparison
-[src][Market Watch][/src]
-    income        income financials comparison
-    balance       balance financials comparison
-    cashflow      cashflow comparison
-[src][Finbrain][/src]
-    sentiment     sentiment analysis comparison
-    scorr         sentiment correlation
-[src][Finviz][/src]
-    overview      brief overview comparison
-    valuation     brief valuation comparison
-    financial     brief financial comparison
-    ownership     brief ownership comparison
-    performance   brief performance comparison
-    technical     brief technical comparison
-
-[menu]>   po            portfolio optimization for selected tickers[/menu]{has_similar_end}
-        """
-        console.print(text=help_text, menu="Stocks - Comparison Analysis")
+        mt = MenuText("stocks/ca/", 80)
+        mt.add_cmd("ticker")
+        mt.add_raw("\n")
+        mt.add_param("_ticker", self.ticker)
+        mt.add_raw("\n")
+        mt.add_cmd("tsne", "", self.ticker)
+        mt.add_cmd("getpoly", "Polygon", self.ticker)
+        mt.add_cmd("getfinnhub", "Finnhub", self.ticker)
+        mt.add_cmd("getfinviz", "Finviz", self.ticker)
+        mt.add_raw("\n")
+        mt.add_cmd("set")
+        mt.add_cmd("add")
+        mt.add_cmd("rmv")
+        mt.add_raw("\n")
+        mt.add_param("_similar", ", ".join(self.similar))
+        mt.add_raw("\n")
+        mt.add_cmd(
+            "historical", "Yahoo Finance", self.similar and len(self.similar) > 1
+        )
+        mt.add_cmd("hcorr", "Yahoo Finance", self.similar and len(self.similar) > 1)
+        mt.add_cmd("volume", "Yahoo Finance", self.similar and len(self.similar) > 1)
+        mt.add_cmd("income", "Market Watch", self.similar and len(self.similar) > 1)
+        mt.add_cmd("balance", "Market Watch", self.similar and len(self.similar) > 1)
+        mt.add_cmd("cashflow", "Market Watch", self.similar and len(self.similar) > 1)
+        mt.add_cmd("sentiment", "FinBrain", self.similar and len(self.similar) > 1)
+        mt.add_cmd("scorr", "FinBrain", self.similar and len(self.similar) > 1)
+        mt.add_cmd("overview", "Finviz", self.similar and len(self.similar) > 1)
+        mt.add_cmd("valuation", "Finviz", self.similar and len(self.similar) > 1)
+        mt.add_cmd("financial", "Finviz", self.similar and len(self.similar) > 1)
+        mt.add_cmd("ownership", "Finviz", self.similar and len(self.similar) > 1)
+        mt.add_cmd("performance", "Finviz", self.similar and len(self.similar) > 1)
+        mt.add_cmd("technical", "Finviz", self.similar and len(self.similar) > 1)
+        console.print(text=mt.menu_text, menu="Stocks - Comparison Analysis")
 
     def custom_reset(self):
         """Class specific component of reset command"""
@@ -169,7 +153,7 @@ class ComparisonAnalysisController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-t")
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             if "," in ns_parser.ticker:
                 console.print("Only one ticker must be selected!")
@@ -216,14 +200,14 @@ class ComparisonAnalysisController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             if self.ticker:
-                self.similar = yahoo_finance_model.get_sp500_comps_tsne(
+                self.similar = yahoo_finance_view.display_sp500_comps_tsne(
                     self.ticker,
                     lr=ns_parser.lr,
                     no_plot=ns_parser.no_plot,
-                    num_tickers=ns_parser.limit,
+                    limit=ns_parser.limit,
                 )
 
                 self.similar = [self.ticker] + self.similar
@@ -233,7 +217,8 @@ class ComparisonAnalysisController(BaseController):
 
             else:
                 console.print(
-                    "You need to 'set' a ticker to get similar companies from first!"
+                    "You need to 'set' a ticker to get similar companies from first! This is "
+                    "for example done by running 'ticker gme'"
                 )
 
     @log_start_end(log=logger)
@@ -263,7 +248,7 @@ class ComparisonAnalysisController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             if self.ticker:
                 if ns_parser.b_no_country:
@@ -271,9 +256,11 @@ class ComparisonAnalysisController(BaseController):
                 else:
                     compare_list = ["Sector", "Industry", "Country"]
 
-                self.similar, self.user = finviz_compare_model.get_similar_companies(
+                self.similar = finviz_compare_model.get_similar_companies(
                     self.ticker, compare_list
                 )
+
+                self.user = "Finviz"
 
                 if self.ticker.upper() in self.similar:
                     self.similar.remove(self.ticker.upper())
@@ -325,13 +312,15 @@ class ComparisonAnalysisController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
 
         if ns_parser:
             if self.ticker:
-                self.similar, self.user = polygon_model.get_similar_companies(
+                self.similar = polygon_model.get_similar_companies(
                     self.ticker, ns_parser.us_only
                 )
+
+                self.user = "Polygon"
 
                 if self.ticker.upper() in self.similar:
                     self.similar.remove(self.ticker.upper())
@@ -375,12 +364,12 @@ class ComparisonAnalysisController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             if self.ticker:
-                self.similar, self.user = finnhub_model.get_similar_companies(
-                    self.ticker
-                )
+                self.similar = finnhub_model.get_similar_companies(self.ticker)
+
+                self.user = "Finnhub"
 
                 if self.ticker.upper() in self.similar:
                     self.similar.remove(self.ticker.upper())
@@ -424,7 +413,7 @@ class ComparisonAnalysisController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-s")
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             if self.similar:
                 self.similar = list(set(self.similar + ns_parser.l_similar))
@@ -455,7 +444,7 @@ class ComparisonAnalysisController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-s")
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             if ns_parser.l_similar:
                 for symbol in ns_parser.l_similar:
@@ -495,7 +484,7 @@ class ComparisonAnalysisController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-s")
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             self.similar = list(set(ns_parser.l_similar))
             self.user = "Custom"
@@ -540,14 +529,14 @@ class ComparisonAnalysisController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-t")
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             if self.similar and len(self.similar) > 1:
                 yahoo_finance_view.display_historical(
-                    similar_tickers=self.similar,
-                    start=ns_parser.start.strftime("%Y-%m-%d"),
+                    similar=self.similar,
+                    start_date=ns_parser.start.strftime("%Y-%m-%d"),
                     candle_type=ns_parser.type_candle,
                     normalize=ns_parser.normalize,
                     export=ns_parser.export,
@@ -575,9 +564,9 @@ class ComparisonAnalysisController(BaseController):
             action="store",
             dest="type_candle",
             type=str,
-            choices=["o", "h", "l", "c", "a"],
+            choices=["o", "h", "l", "c", "a", "r"],
             default="a",  # in case it's adjusted close
-            help="Candle data to use: o-open, h-high, l-low, c-close, a-adjusted close.",
+            help="Candle data to use: o-open, h-high, l-low, c-close, a-adjusted close, r-returns.",
         )
         parser.add_argument(
             "-s",
@@ -587,17 +576,25 @@ class ComparisonAnalysisController(BaseController):
             dest="start",
             help="The starting date (format YYYY-MM-DD) of the stock",
         )
+        parser.add_argument(
+            "--display-full-matrix",
+            action="store_true",
+            help="Display all matrix values, rather than masking off half.",
+        )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-t")
-        ns_parser = parse_known_args_and_warn(
-            parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
+        ns_parser = self.parse_known_args_and_warn(
+            parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES, raw=True
         )
         if ns_parser:
             if self.similar and len(self.similar) > 1:
                 yahoo_finance_view.display_correlation(
-                    similar_tickers=self.similar,
-                    start=ns_parser.start.strftime("%Y-%m-%d"),
+                    similar=self.similar,
+                    start_date=ns_parser.start.strftime("%Y-%m-%d"),
                     candle_type=ns_parser.type_candle,
+                    export=ns_parser.export,
+                    display_full_matrix=ns_parser.display_full_matrix,
+                    raw=ns_parser.raw,
                 )
             else:
                 console.print("Please make sure there are similar tickers selected. \n")
@@ -632,12 +629,12 @@ class ComparisonAnalysisController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-t")
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             marketwatch_view.display_income_comparison(
-                similar=self.similar,
+                symbols=self.similar,
                 timeframe=ns_parser.s_timeframe,
                 quarter=ns_parser.b_quarter,
             )
@@ -662,14 +659,14 @@ class ComparisonAnalysisController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-s")
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
             if self.similar and len(self.similar) > 1:
                 yahoo_finance_view.display_volume(
-                    similar_tickers=self.similar,
-                    start=ns_parser.start.strftime("%Y-%m-%d"),
+                    similar=self.similar,
+                    start_date=ns_parser.start.strftime("%Y-%m-%d"),
                     export=ns_parser.export,
                 )
 
@@ -704,12 +701,12 @@ class ComparisonAnalysisController(BaseController):
             default=None,
             help="Specify yearly/quarterly timeframe. Default is last.",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             marketwatch_view.display_balance_comparison(
-                similar=self.similar,
+                symbols=self.similar,
                 timeframe=ns_parser.s_timeframe,
                 quarter=ns_parser.b_quarter,
             )
@@ -742,12 +739,12 @@ class ComparisonAnalysisController(BaseController):
             default=None,
             help="Specify yearly/quarterly timeframe. Default is last.",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             marketwatch_view.display_cashflow_comparison(
-                similar=self.similar,
+                symbols=self.similar,
                 timeframe=ns_parser.s_timeframe,
                 quarter=ns_parser.b_quarter,
             )
@@ -771,7 +768,7 @@ class ComparisonAnalysisController(BaseController):
             help="Display raw sentiment data",
             dest="raw",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
@@ -805,7 +802,7 @@ class ComparisonAnalysisController(BaseController):
             help="Display raw sentiment data",
             dest="raw",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
@@ -829,7 +826,7 @@ class ComparisonAnalysisController(BaseController):
                 Prints screener data of similar companies. [Source: Finviz]
             """,
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
@@ -855,7 +852,7 @@ class ComparisonAnalysisController(BaseController):
                 Prints screener data of similar companies. [Source: Finviz]
             """,
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
@@ -881,7 +878,7 @@ class ComparisonAnalysisController(BaseController):
                 Prints screener data of similar companies. [Source: Finviz]
             """,
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
@@ -907,7 +904,7 @@ class ComparisonAnalysisController(BaseController):
                 Prints screener data of similar companies. [Source: Finviz]
             """,
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
@@ -933,7 +930,7 @@ class ComparisonAnalysisController(BaseController):
                 Prints screener data of similar companies. [Source: Finviz]
             """,
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
@@ -959,7 +956,7 @@ class ComparisonAnalysisController(BaseController):
                 Prints screener data of similar companies. [Source: Finviz]
             """,
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
@@ -973,15 +970,3 @@ class ComparisonAnalysisController(BaseController):
                 console.print(
                     "Please make sure there are more than 1 similar tickers selected. \n"
                 )
-
-    @log_start_end(log=logger)
-    def call_po(self, _):
-        """Call the portfolio optimization menu with selected tickers"""
-        if self.similar and len(self.similar) > 1:
-            self.queue = po_controller.PortfolioOptimizationController(
-                self.similar, self.queue
-            ).menu(custom_path_menu_above="/portfolio/")
-        else:
-            console.print(
-                "Please make sure there are more than 1 similar tickers selected. \n"
-            )

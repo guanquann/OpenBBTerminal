@@ -30,12 +30,12 @@ from openbb_terminal.helper_funcs import (
     check_non_negative_float,
     check_positive,
     export_data,
-    parse_known_args_and_warn,
     valid_date,
+    compose_export_path,
 )
 from openbb_terminal.menu import session
 from openbb_terminal.parent_classes import BaseController
-from openbb_terminal.rich_config import console
+from openbb_terminal.rich_config import console, MenuText
 from openbb_terminal.stocks import stocks_helper
 from openbb_terminal.stocks.comparison_analysis import ca_controller
 
@@ -79,43 +79,43 @@ class ETFController(BaseController):
         self.etf_name = ""
         self.etf_data = ""
         self.etf_holdings: List = list()
+        self.TRY_RELOAD = True
 
         if session and obbff.USE_PROMPT_TOOLKIT:
             choices: dict = {c: {} for c in self.controller_choices}
+
+            choices["support"] = self.SUPPORT_CHOICES
+            choices["about"] = self.ABOUT_CHOICES
+
             self.completer = NestedCompleter.from_nested_dict(choices)
 
     def print_help(self):
         """Print help"""
-        has_ticker_start = "" if self.etf_name else "[unvl]"
-        has_ticker_end = "" if self.etf_name else "[/unvl]"
-        has_etfs_start = "[unvl]" if len(self.etf_holdings) == 0 else ""
-        has_etfs_end = "[/unvl]" if len(self.etf_holdings) == 0 else ""
-        help_text = f"""[cmds]
-    ln            lookup by name [src][FinanceDatabase/StockAnalysis.com][/src]
-    ld            lookup by description [src][FinanceDatabase][/src]
-    load          load ETF data [src][Yfinance][/src][/cmds]
-
-[param]Symbol: [/param]{self.etf_name}{has_etfs_start}
-[param]Major holdings: [/param]{', '.join(self.etf_holdings)}
-[menu]
->   ca            comparison analysis,          e.g.: get similar, historical, correlation, financials{has_etfs_end}
->   disc          discover ETFs,                e.g.: gainers/decliners/active
->   scr           screener ETFs,                e.g.: overview/performance, using preset filters[/menu]
-{has_ticker_start}[cmds]
-    overview      get overview [src][StockAnalysis][/src]
-    holdings      top company holdings [src][StockAnalysis][/src]
-    weights       sector weights allocation [src][Yfinance][/src]
-    summary       summary description of the ETF [src][Yfinance][/src]
-    candle        view a candle chart for ETF
-    news          latest news of the company [src][News API][/src]
-
-    pir           create (multiple) passive investor excel report(s) [src][PassiveInvestor][/src]
-    compare       compare multiple different ETFs [src][StockAnalysis][/src][/cmds]
-[menu]
->   ta            technical analysis,           e.g.: ema, macd, rsi, adx, bbands, obv
->   pred          prediction techniques,        e.g.: regression, arima, rnn, lstm[/menu]
-{has_ticker_end}"""
-        console.print(text=help_text, menu="ETF")
+        mt = MenuText("etf/")
+        mt.add_cmd("ln", "FinanceDatabase / StockAnalysis")
+        mt.add_cmd("ld", "FinanceDatabase")
+        mt.add_cmd("load", "Yahoo Finance")
+        mt.add_raw("\n")
+        mt.add_param("_symbol", self.etf_name)
+        mt.add_param("_major_holdings", ", ".join(self.etf_holdings))
+        mt.add_raw("\n")
+        mt.add_menu("ca", len(self.etf_holdings))
+        mt.add_menu("disc")
+        mt.add_menu("scr")
+        mt.add_raw("\n")
+        mt.add_cmd("overview", "StockAnalysis", self.etf_name)
+        mt.add_cmd("holdings", "StockAnalysis", self.etf_name)
+        mt.add_cmd("weights", "Yahoo Finance", self.etf_name)
+        mt.add_cmd("summary", "Yahoo Finance", self.etf_name)
+        mt.add_cmd("news", "News API", self.etf_name)
+        mt.add_cmd("candle", "", self.etf_name)
+        mt.add_raw("\n")
+        mt.add_cmd("pir", "PassiveInvestor", self.etf_name)
+        mt.add_cmd("compare", "StockAnalysis", self.etf_name)
+        mt.add_raw("\n")
+        mt.add_menu("ta", self.etf_name)
+        mt.add_menu("pred", self.etf_name)
+        console.print(text=mt.menu_text, menu="ETF")
 
     def custom_reset(self):
         """Class specific component of reset command"""
@@ -141,29 +141,15 @@ class ETFController(BaseController):
             help="Name to look for ETFs",
             required="-h" not in other_args,
         )
-        parser.add_argument(
-            "-s",
-            "--source",
-            type=str,
-            default="fd",
-            dest="source",
-            help="Name to search for, using either FinanceDatabase (fd) or StockAnalysis (sa) as source.",
-            choices=["sa", "fd"],
-        )
-        parser.add_argument(
-            "-l",
-            "--limit",
-            type=check_positive,
-            dest="limit",
-            help="Limit of ETFs to display",
-            default=5,
-        )
 
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-n")
 
-        ns_parser = parse_known_args_and_warn(
-            parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
+        ns_parser = self.parse_known_args_and_warn(
+            parser,
+            other_args,
+            limit=5,
+            export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED,
         )
         if ns_parser:
             name_to_search = " ".join(ns_parser.name)
@@ -212,7 +198,7 @@ class ETFController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-d")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
@@ -267,7 +253,7 @@ class ETFController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-t")
 
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             df_etf_candidate = yf.download(
                 ns_parser.ticker,
@@ -297,7 +283,8 @@ class ETFController(BaseController):
                             na_tix_idx.append(str(idx))
 
                     console.print(
-                        f"n/a tickers found at position {','.join(na_tix_idx)}.  Dropping these from holdings.\n"
+                        f"n/a tickers found at position {','.join(na_tix_idx)}. "
+                        " Dropping these from holdings.\n"
                     )
 
                 self.etf_holdings = list(
@@ -319,7 +306,7 @@ class ETFController(BaseController):
             prog="overview",
             description="Get overview data for selected etf",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
 
@@ -348,13 +335,13 @@ class ETFController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
             stockanalysis_view.view_holdings(
                 symbol=self.etf_name,
-                num_to_show=ns_parser.limit,
+                limit=ns_parser.limit,
                 export=ns_parser.export,
             )
 
@@ -365,7 +352,8 @@ class ETFController(BaseController):
             add_help=False,
             prog="news",
             description="""
-                Prints latest news about ETF, including date, title and web link. [Source: News API]
+                Prints latest news about ETF, including date, title and web link.
+                [Source: News API]
             """,
         )
         parser.add_argument(
@@ -403,7 +391,7 @@ class ETFController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             if self.etf_name:
                 sources = ns_parser.sources
@@ -414,11 +402,11 @@ class ETFController(BaseController):
                 d_stock = yf.Ticker(self.etf_name).info
 
                 newsapi_view.display_news(
-                    term=d_stock["shortName"].replace(" ", "+")
+                    query=d_stock["shortName"].replace(" ", "+")
                     if "shortName" in d_stock
                     else self.etf_name,
-                    num=ns_parser.limit,
-                    s_from=ns_parser.n_start_date.strftime("%Y-%m-%d"),
+                    limit=ns_parser.limit,
+                    start_date=ns_parser.n_start_date.strftime("%Y-%m-%d"),
                     show_newest=ns_parser.n_oldest,
                     sources=",".join(sources),
                 )
@@ -498,7 +486,7 @@ class ETFController(BaseController):
             default="",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
@@ -514,10 +502,10 @@ class ETFController(BaseController):
 
                 if ns_parser.raw:
                     qa_view.display_raw(
-                        df=self.etf_data,
-                        sort=ns_parser.sort,
-                        des=ns_parser.descending,
-                        num=ns_parser.num,
+                        data=self.etf_data,
+                        sortby=ns_parser.sort,
+                        descend=ns_parser.descending,
+                        limit=ns_parser.num,
                     )
 
                 else:
@@ -530,8 +518,8 @@ class ETFController(BaseController):
                     )
 
                     stocks_helper.display_candle(
-                        s_ticker=self.etf_name,
-                        df_stock=data,
+                        symbol=self.etf_name,
+                        data=data,
                         use_matplotlib=ns_parser.plotly,
                         intraday=False,
                         add_trend=ns_parser.trendlines,
@@ -569,15 +557,16 @@ class ETFController(BaseController):
         )
         parser.add_argument(
             "--folder",
-            default=os.path.dirname(os.path.abspath(__file__)).replace(
-                "openbb_terminal", "exports"
-            ),
+            default=compose_export_path(
+                func_name=parser.prog,
+                dir_path=os.path.dirname(os.path.abspath(__file__)),
+            )[0],
             dest="folder",
             help="Folder where the excel ETF report will be saved",
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-e")
-        ns_parser = parse_known_args_and_warn(parser, other_args)
+        ns_parser = self.parse_known_args_and_warn(parser, other_args)
         if ns_parser:
             if ns_parser.names:
                 create_ETF_report(
@@ -615,7 +604,7 @@ class ETFController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-l")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
         if ns_parser:
@@ -635,7 +624,7 @@ class ETFController(BaseController):
             prog="summary",
             description="Print ETF description summary",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser,
             other_args,
         )
@@ -661,7 +650,18 @@ class ETFController(BaseController):
     @log_start_end(log=logger)
     def call_pred(self, _):
         """Process pred command"""
-        if obbff.ENABLE_PREDICT:
+        # IMPORTANT: 8/11/22 prediction was discontinued on the installer packages
+        # because forecasting in coming out soon.
+        # This if statement disallows installer package users from using 'pred'
+        # even if they turn on the OPENBB_ENABLE_PREDICT feature flag to true
+        # however it does not prevent users who clone the repo from using it
+        # if they have ENABLE_PREDICT set to true.
+        if obbff.PACKAGED_APPLICATION or not obbff.ENABLE_PREDICT:
+            console.print(
+                "Predict is disabled. Forecasting coming soon!",
+                "\n",
+            )
+        else:
             if self.etf_name:
                 try:
                     from openbb_terminal.etf.prediction_techniques import (
@@ -688,11 +688,6 @@ class ETFController(BaseController):
                     )
             else:
                 console.print("Use 'load <ticker>' prior to this command!", "\n")
-        else:
-            console.print(
-                "Predict is disabled. Check ENABLE_PREDICT flag on feature_flags.py",
-                "\n",
-            )
 
     @log_start_end(log=logger)
     def call_ca(self, _):
@@ -737,7 +732,14 @@ class ETFController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-e")
 
-        ns_parser = parse_known_args_and_warn(
+        # to allow inputs with spaces in between them instead of commas (inputs with spaces are not parsed correctly)
+
+        if len(other_args) > 2:
+            for i in range(2, len(other_args)):
+                other_args[1] += "," + other_args[i]
+            del other_args[2 : len(other_args)]
+
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:

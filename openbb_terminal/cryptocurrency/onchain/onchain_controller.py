@@ -35,12 +35,11 @@ from openbb_terminal.helper_funcs import (
     EXPORT_ONLY_RAW_DATA_ALLOWED,
     check_int_range,
     check_positive,
-    parse_known_args_and_warn,
     valid_date,
 )
 from openbb_terminal.menu import session
 from openbb_terminal.parent_classes import BaseController
-from openbb_terminal.rich_config import console
+from openbb_terminal.rich_config import console, MenuText
 
 logger = logging.getLogger(__name__)
 
@@ -128,52 +127,41 @@ class OnchainController(BaseController):
             choices["ttcp"] = {c: None for c in bitquery_model.DECENTRALIZED_EXCHANGES}
             choices["ttcp"]["-s"] = {c: None for c in bitquery_model.TTCP_FILTERS}
             choices["baas"]["-s"] = {c: None for c in bitquery_model.BAAS_FILTERS}
+
+            choices["support"] = self.SUPPORT_CHOICES
+            choices["about"] = self.ABOUT_CHOICES
+
             self.completer = NestedCompleter.from_nested_dict(choices)
 
     def print_help(self):
         """Print help"""
-        has_account_start = "[unvl]" if self.address_type != "account" else ""
-        has_account_end = "[unvl]" if self.address_type != "account" else ""
-
-        has_token_start = "[unvl]" if self.address_type != "token" else ""
-        has_token_end = "[unvl]" if self.address_type != "token" else ""
-
-        has_tx_start = "[unvl]" if self.address_type != "tx" else ""
-        has_tx_end = "[unvl]" if self.address_type != "tx" else ""
-
-        help_text = f"""[cmds]
-[src][Glassnode][/src]
-    hr               check blockchain hashrate over time (BTC or ETH)
-[src][Blockchain][/src]
-    btccp            displays BTC circulating supply
-    btcct            displays BTC confirmed transactions
-[src][Eth Gas Station][/src]
-    gwei             check current eth gas fees
-[src][Whale Alert][/src]
-    whales           check crypto wales transactions
-[src][BitQuery][/src]
-    lt               last trades by dex or month
-    dvcp             daily volume for crypto pair
-    tv               token volume on DEXes
-    ueat             unique ethereum addresses which made a transaction
-    ttcp             top traded crypto pairs on given decentralized exchange
-    baas             bid, ask prices, average spread for given crypto pair
-
-[param]Ethereum address: [/param]{self.address}
-[param]Address type: [/param]{self.address_type if self.address_type else ''}
-
-[src][Ethplorer][/src] [info]Ethereum:[/info]
-    address         load ethereum address of token, account or transaction
-    top             top ERC20 tokens{has_account_start}
-    balance         check ethereum balance
-    hist            ethereum balance history (transactions){has_account_end}{has_token_start}
-    info            ERC20 token info
-    holders         top ERC20 token holders
-    th              ERC20 token history
-    prices          ERC20 token historical prices{has_token_end}{has_tx_start}
-    tx              ethereum blockchain transaction info{has_tx_end}
-    """
-        console.print(text=help_text, menu="Cryptocurrency - Onchain")
+        mt = MenuText("crypto/onchain/")
+        mt.add_cmd("hr", "Glassnode")
+        mt.add_cmd("btccp", "Blockchain")
+        mt.add_cmd("btcct", "Blockchain")
+        mt.add_cmd("gwei", "ETH Gas Stations")
+        mt.add_cmd("whales", "Whale Alert")
+        mt.add_cmd("lt", "BitQuery")
+        mt.add_cmd("dvcp", "BitQuery")
+        mt.add_cmd("tv", "BitQuery")
+        mt.add_cmd("ueat", "BitQuery")
+        mt.add_cmd("ttcp", "BitQuery")
+        mt.add_cmd("baas", "BitQuery")
+        mt.add_raw("\n")
+        mt.add_param("_address", self.address or "")
+        mt.add_param("_type", self.address_type or "")
+        mt.add_raw("\n")
+        mt.add_info("_ethereum_")
+        mt.add_cmd("address", "Ethplorer")
+        mt.add_cmd("top", "Ethplorer")
+        mt.add_cmd("balance", "Ethplorer", self.address_type == "account")
+        mt.add_cmd("hist", "Ethplorer", self.address_type == "account")
+        mt.add_cmd("info", "Ethplorer", self.address_type == "token")
+        mt.add_cmd("holders", "Ethplorer", self.address_type == "token")
+        mt.add_cmd("th", "Ethplorer", self.address_type == "token")
+        mt.add_cmd("prices", "Ethplorer", self.address_type == "token")
+        mt.add_cmd("tx", "Ethplorer", self.address_type == "tx")
+        console.print(text=mt.menu_text, menu="Cryptocurrency - Onchain")
 
     @log_start_end(log=logger)
     def call_btcct(self, other_args: List[str]):
@@ -205,7 +193,7 @@ class OnchainController(BaseController):
             default=(datetime.now()).strftime("%Y-%m-%d"),
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
 
@@ -246,7 +234,7 @@ class OnchainController(BaseController):
             default=(datetime.now()).strftime("%Y-%m-%d"),
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
 
@@ -295,7 +283,7 @@ class OnchainController(BaseController):
             "--since",
             dest="since",
             type=valid_date,
-            help="Initial date. Default: 2020-01-01",
+            help=f"Initial date. Default: {(datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')}",
             default=(datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d"),
         )
 
@@ -304,20 +292,20 @@ class OnchainController(BaseController):
             "--until",
             dest="until",
             type=valid_date,
-            help="Final date. Default: 2021-01-01",
+            help=f"Final date. Default: {(datetime.now()).strftime('%Y-%m-%d')}",
             default=(datetime.now()).strftime("%Y-%m-%d"),
         )
 
         if other_args and not other_args[0][0] == "-":
             other_args.insert(0, "-c")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_BOTH_RAW_DATA_AND_FIGURES
         )
 
         if ns_parser:
             display_hashrate(
-                asset=ns_parser.coin,
+                symbol=ns_parser.coin,
                 interval=ns_parser.interval,
                 since=int(datetime.timestamp(ns_parser.since)),
                 until=int(datetime.timestamp(ns_parser.until)),
@@ -337,7 +325,7 @@ class OnchainController(BaseController):
             """,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
 
@@ -402,7 +390,7 @@ class OnchainController(BaseController):
             default=False,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
         if ns_parser:
@@ -410,7 +398,7 @@ class OnchainController(BaseController):
                 min_value=ns_parser.min,
                 top=ns_parser.limit,
                 sortby=ns_parser.sortby,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 show_address=ns_parser.address,
                 export=ns_parser.export,
             )
@@ -464,7 +452,7 @@ class OnchainController(BaseController):
         if other_args and not other_args[0][0] == "-":
             other_args.insert(0, "--address")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
 
@@ -531,7 +519,7 @@ class OnchainController(BaseController):
             default=True,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
 
@@ -539,7 +527,7 @@ class OnchainController(BaseController):
             ethplorer_view.display_address_info(
                 top=ns_parser.limit,
                 sortby=ns_parser.sortby,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 address=self.address,
                 export=ns_parser.export,
             )
@@ -587,7 +575,7 @@ class OnchainController(BaseController):
             default=True,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
 
@@ -595,7 +583,7 @@ class OnchainController(BaseController):
             ethplorer_view.display_address_history(
                 top=ns_parser.limit,
                 sortby=ns_parser.sortby,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 address=self.address,
                 export=ns_parser.export,
             )
@@ -642,7 +630,7 @@ class OnchainController(BaseController):
             default=False,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
 
@@ -650,7 +638,7 @@ class OnchainController(BaseController):
             ethplorer_view.display_top_token_holders(
                 top=ns_parser.limit,
                 sortby=ns_parser.sortby,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 address=self.address,
                 export=ns_parser.export,
             )
@@ -697,7 +685,7 @@ class OnchainController(BaseController):
             default=True,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
 
@@ -705,7 +693,7 @@ class OnchainController(BaseController):
             ethplorer_view.display_top_tokens(
                 top=ns_parser.limit,
                 sortby=ns_parser.sortby,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 export=ns_parser.export,
             )
 
@@ -730,7 +718,7 @@ class OnchainController(BaseController):
             default=False,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
 
@@ -792,7 +780,7 @@ class OnchainController(BaseController):
             default=True,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
 
@@ -801,7 +789,7 @@ class OnchainController(BaseController):
                 top=ns_parser.limit,
                 hash_=ns_parser.hash,
                 sortby=ns_parser.sortby,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 address=self.address,
                 export=ns_parser.export,
             )
@@ -822,7 +810,7 @@ class OnchainController(BaseController):
               """,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
 
@@ -874,7 +862,7 @@ class OnchainController(BaseController):
             default=False,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
 
@@ -882,7 +870,7 @@ class OnchainController(BaseController):
             ethplorer_view.display_token_historical_prices(
                 top=ns_parser.limit,
                 sortby=ns_parser.sortby,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 address=self.address,
                 export=ns_parser.export,
             )
@@ -958,7 +946,7 @@ class OnchainController(BaseController):
             default=False,
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
 
@@ -969,7 +957,7 @@ class OnchainController(BaseController):
                 top=ns_parser.limit,
                 days=ns_parser.days,
                 sortby=ns_parser.sortby,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 export=ns_parser.export,
             )
 
@@ -1038,7 +1026,7 @@ class OnchainController(BaseController):
         if other_args and not other_args[0][0] == "-":
             other_args.insert(0, "-c")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
 
@@ -1048,7 +1036,7 @@ class OnchainController(BaseController):
                 vs=ns_parser.vs,
                 top=ns_parser.days,
                 sortby=ns_parser.sortby,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 export=ns_parser.export,
             )
 
@@ -1113,7 +1101,7 @@ class OnchainController(BaseController):
         if other_args and not other_args[0][0] == "-":
             other_args.insert(0, "-c")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
 
@@ -1123,7 +1111,7 @@ class OnchainController(BaseController):
                 trade_amount_currency=ns_parser.vs,
                 top=ns_parser.limit,
                 sortby=ns_parser.sortby,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 export=ns_parser.export,
             )
 
@@ -1180,7 +1168,7 @@ class OnchainController(BaseController):
             dest="descend",
             default=False,
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
 
@@ -1189,7 +1177,7 @@ class OnchainController(BaseController):
                 interval=ns_parser.interval,
                 limit=ns_parser.limit,
                 sortby=ns_parser.sortby,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 export=ns_parser.export,
             )
 
@@ -1254,7 +1242,7 @@ class OnchainController(BaseController):
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-e")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
 
@@ -1298,7 +1286,7 @@ class OnchainController(BaseController):
                 top=ns_parser.limit,
                 exchange=exchange,
                 sortby=ns_parser.sortby,
-                descend=ns_parser.descend,
+                ascend=not ns_parser.descend,
                 export=ns_parser.export,
             )
 
@@ -1357,7 +1345,7 @@ class OnchainController(BaseController):
         if other_args and not other_args[0][0] == "-":
             other_args.insert(0, "-c")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_RAW_DATA_ALLOWED
         )
 
@@ -1369,7 +1357,7 @@ class OnchainController(BaseController):
                         vs=ns_parser.vs,
                         days=ns_parser.days,
                         sortby=ns_parser.sortby,
-                        descend=ns_parser.descend,
+                        ascend=not ns_parser.descend,
                         export=ns_parser.export,
                     )
 
@@ -1392,7 +1380,7 @@ class OnchainController(BaseController):
                             vs=ns_parser.vs,
                             days=ns_parser.days,
                             sortby=ns_parser.sortby,
-                            descend=ns_parser.descend,
+                            ascend=not ns_parser.descend,
                             export=ns_parser.export,
                         )
                     else:

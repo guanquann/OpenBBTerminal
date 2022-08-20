@@ -28,12 +28,11 @@ from openbb_terminal.helper_funcs import (
     EXPORT_ONLY_FIGURES_ALLOWED,
     check_positive,
     get_next_stock_market_days,
-    parse_known_args_and_warn,
     valid_date,
 )
 from openbb_terminal.menu import session
 from openbb_terminal.parent_classes import BaseController
-from openbb_terminal.rich_config import console
+from openbb_terminal.rich_config import console, MenuText
 from openbb_terminal.stocks import stocks_helper
 
 logger = logging.getLogger(__name__)
@@ -100,27 +99,26 @@ class PredictionTechniquesController(BaseController):
                 f"{s_intraday} {self.ticker} (from {self.start.strftime('%Y-%m-%d')})"
             )
         else:
-            stock_info = "{s_intraday} {self.ticker}"
+            stock_info = f"{s_intraday} {self.ticker}"
 
-        help_text = f"""[cmds]
-    load        load new ticker
-    pick        pick new target variable[/cmds]
-
-[param]Stock: [/param]{stock_info}
-[param]Target Column: [/param]{self.target}
-
-[info]Models:[/info][cmds]
-    ets         exponential smoothing (e.g. Holt-Winters)
-    knn         k-Nearest Neighbors
-    regression  polynomial regression
-    arima       autoregressive integrated moving average
-    mlp         MultiLayer Perceptron
-    rnn         Recurrent Neural Network
-    lstm        Long-Short Term Memory
-    conv1d      1D Convolutional Neural Network
-    mc          Monte-Carlo simulations[/cmds]
-        """
-        console.print(text=help_text, menu="Stocks - Prediction Techniques")
+        mt = MenuText("stocks/pred/")
+        mt.add_cmd("load")
+        mt.add_cmd("pick")
+        mt.add_raw("\n")
+        mt.add_param("_ticker", stock_info)
+        mt.add_param("_target", self.target)
+        mt.add_raw("\n")
+        mt.add_info("_models_")
+        mt.add_cmd("ets")
+        mt.add_cmd("knn")
+        mt.add_cmd("regression")
+        mt.add_cmd("arima")
+        mt.add_cmd("mlp")
+        mt.add_cmd("rnn")
+        mt.add_cmd("lstm")
+        mt.add_cmd("conv1d")
+        mt.add_cmd("mc")
+        console.print(text=mt.menu_text, menu="Stocks - Prediction Techniques")
 
     def custom_reset(self):
         """Class specific component of reset command"""
@@ -149,7 +147,7 @@ class PredictionTechniquesController(BaseController):
         if other_args and "-t" not in other_args and "-h" not in other_args:
             other_args.insert(0, "-t")
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_FIGURES_ALLOWED
         )
         if ns_parser:
@@ -224,7 +222,7 @@ class PredictionTechniquesController(BaseController):
             default=None,
             help="The end date (format YYYY-MM-DD) to select - Backtesting",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_FIGURES_ALLOWED
         )
         if ns_parser:
@@ -248,13 +246,13 @@ class PredictionTechniquesController(BaseController):
                     )
 
             ets_view.display_exponential_smoothing(
-                ticker=self.ticker,
-                values=self.stock[self.target],
+                dataset=self.ticker,
+                data=self.stock[self.target],
                 n_predict=ns_parser.n_days,
                 trend=ns_parser.trend,
                 seasonal=ns_parser.seasonal,
                 seasonal_periods=ns_parser.seasonal_periods,
-                s_end_date=ns_parser.s_end_date,
+                end_date=ns_parser.s_end_date,
                 export=ns_parser.export,
             )
 
@@ -331,12 +329,12 @@ class PredictionTechniquesController(BaseController):
             default=True,
             help="Specify if shuffling validation inputs.",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, EXPORT_ONLY_FIGURES_ALLOWED
         )
         if ns_parser:
             knn_view.display_k_nearest_neighbors(
-                ticker=self.ticker,
+                dataset=self.ticker,
                 data=self.stock[self.target],
                 n_neighbors=ns_parser.n_neighbors,
                 n_input_days=ns_parser.n_inputs,
@@ -407,7 +405,7 @@ class PredictionTechniquesController(BaseController):
         )
         if other_args and "-" not in other_args[0][0]:
             other_args.insert(0, "-p")
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_FIGURES_ALLOWED
         )
         if ns_parser:
@@ -436,7 +434,7 @@ class PredictionTechniquesController(BaseController):
                 n_input=ns_parser.n_inputs,
                 n_predict=ns_parser.n_days,
                 n_jumps=ns_parser.n_jumps,
-                s_end_date=ns_parser.s_end_date,
+                end_date=ns_parser.s_end_date,
                 export=ns_parser.export,
             )
 
@@ -511,7 +509,7 @@ class PredictionTechniquesController(BaseController):
             default=None,
             help="The end date (format YYYY-MM-DD) to select - Backtesting",
         )
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_FIGURES_ALLOWED
         )
         if ns_parser:
@@ -542,7 +540,7 @@ class PredictionTechniquesController(BaseController):
                 seasonal=ns_parser.b_seasonal,
                 ic=ns_parser.s_ic,
                 results=ns_parser.b_results,
-                s_end_date=ns_parser.s_end_date,
+                end_date=ns_parser.s_end_date,
                 export=ns_parser.export,
             )
 
@@ -700,7 +698,7 @@ class PredictionTechniquesController(BaseController):
             help="Whether to model returns or log returns",
         )
 
-        ns_parser = parse_known_args_and_warn(
+        ns_parser = self.parse_known_args_and_warn(
             parser, other_args, export_allowed=EXPORT_ONLY_FIGURES_ALLOWED
         )
         if ns_parser:

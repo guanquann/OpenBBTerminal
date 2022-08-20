@@ -12,14 +12,13 @@ from binance.exceptions import BinanceAPIException
 
 import openbb_terminal.config_terminal as cfg
 from openbb_terminal.decorators import log_start_end
-from openbb_terminal.rich_config import console
 
 logger = logging.getLogger(__name__)
 
 
 @log_start_end(log=logger)
 def _get_trading_pairs() -> List[dict]:
-    """Helper method that return all trading pairs on binance. Other methods are use this data as an input for e.g
+    """Helper method that return all trading pairs on binance. Methods ause this data for input for e.g
     building dataframe with all coins, or to build dict of all trading pairs. [Source: Binance]
 
     Returns
@@ -28,8 +27,8 @@ def _get_trading_pairs() -> List[dict]:
         list of dictionaries in format:
         [
             {'symbol': 'ETHBTC', 'status': 'TRADING', 'baseAsset': 'ETH', 'baseAssetPrecision': 8,
-            'quoteAsset': 'BTC', 'quotePrecision': 8, 'quoteAssetPrecision': 8, 'baseCommissionPrecision': 8,
-            'quoteCommissionPrecision': 8,
+            'quoteAsset': 'BTC', 'quotePrecision': 8, 'quoteAssetPrecision': 8,
+            'baseCommissionPrecision': 8, 'quoteCommissionPrecision': 8,
             'orderTypes': ['LIMIT', 'LIMIT_MAKER', 'MARKET', 'STOP_LOSS_LIMIT', 'TAKE_PROFIT_LIMIT'],
             'icebergAllowed': True,
             'ocoAllowed': True,
@@ -127,5 +126,4 @@ def show_available_pairs_for_given_symbol(
     for k, v in pairs.items():
         if k == symbol_upper:
             return k, v
-    console.print(f"Couldn't find anything for symbol {symbol_upper}\n")
     return None, []

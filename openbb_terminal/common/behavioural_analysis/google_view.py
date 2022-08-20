@@ -16,6 +16,7 @@ from openbb_terminal.helper_funcs import (
     export_data,
     plot_autoscale,
     print_rich_table,
+    is_valid_axes_count,
 )
 from openbb_terminal.rich_config import console
 
@@ -24,8 +25,8 @@ logger = logging.getLogger(__name__)
 
 @log_start_end(log=logger)
 def display_mentions(
-    ticker: str,
-    start: str,
+    symbol: str,
+    start_date: str = "",
     export: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
 ):
@@ -33,41 +34,39 @@ def display_mentions(
 
     Parameters
     ----------
-    ticker : str
-        Ticker
-    start : str
+    symbol : str
+        Ticker symbol
+    start_date : str
         Start date as YYYY-MM-DD string
     export: str
         Format to export data
     external_axes : Optional[List[plt.Axes]], optional
         External axes (1 axis is expected in the list), by default None
     """
-    df_interest = google_model.get_mentions(ticker)
+    df_interest = google_model.get_mentions(symbol)
 
     # This plot has 1 axis
     if external_axes is None:
         _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
-    else:
-        if len(external_axes) != 1:
-            logger.error("Expected list of one axis item.")
-            console.print("[red]Expected list of one axis item./n[/red]")
-            return
+    elif is_valid_axes_count(external_axes, 1):
         (ax,) = external_axes
+    else:
+        return
 
-    ax.set_title(f"Interest over time on {ticker}")
-    if start:
-        df_interest = df_interest[start:]  # type: ignore
-        ax.bar(df_interest.index, df_interest[ticker], width=2)
+    ax.set_title(f"Interest over time on {symbol}")
+    if start_date:
+        df_interest = df_interest[start_date:]  # type: ignore
+        ax.bar(df_interest.index, df_interest[symbol], width=2)
         ax.bar(
             df_interest.index[-1],
-            df_interest[ticker].values[-1],
+            df_interest[symbol].values[-1],
             width=theme.volume_bar_width,
         )
     else:
-        ax.bar(df_interest.index, df_interest[ticker], width=1)
+        ax.bar(df_interest.index, df_interest[symbol], width=1)
         ax.bar(
             df_interest.index[-1],
-            df_interest[ticker].values[-1],
+            df_interest[symbol].values[-1],
             width=theme.volume_bar_width,
         )
     ax.set_ylabel("Interest [%]")
@@ -84,8 +83,8 @@ def display_mentions(
 
 @log_start_end(log=logger)
 def display_correlation_interest(
-    ticker: str,
-    df_data: pd.DataFrame,
+    symbol: str,
+    data: pd.DataFrame,
     words: List[str],
     export: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
@@ -94,9 +93,9 @@ def display_correlation_interest(
 
     Parameters
     ----------
-    ticker : str
-        Ticker to check price
-    df_data : pd.DataFrame
+    symbol : str
+        Ticker symbol to check price
+    data : pd.DataFrame
         Data dataframe
     words : List[str]
         Words to check for interest for
@@ -116,22 +115,20 @@ def display_correlation_interest(
             sharex=True,
             gridspec_kw={"height_ratios": [1, 2]},
         )
-    else:
-        if len(external_axes) != 1:
-            logger.error("Expected list of one axis item.")
-            console.print("[red]Expected list of one axis item./n[/red]")
-            return
+    elif is_valid_axes_count(external_axes, 1):
         (ax,) = external_axes
+    else:
+        return
     ax[0].set_title(
-        f"{ticker.upper()} stock price and interest over time on {','.join(words)}"
+        f"{symbol.upper()} stock price and interest over time on {','.join(words)}"
     )
     ax[0].plot(
-        df_data.index,
-        df_data["Adj Close"].values,
+        data.index,
+        data["Adj Close"].values,
         c="#FCED00",
     )
     ax[0].set_ylabel("Stock Price")
-    ax[0].set_xlim(df_data.index[0], df_data.index[-1])
+    ax[0].set_xlim(data.index[0], data.index[-1])
 
     colors = theme.get_colors()[1:]
     for idx, word in enumerate(words):
@@ -139,7 +136,7 @@ def display_correlation_interest(
         ax[1].plot(df_interest.index, df_interest[word], "-", color=colors[idx])
 
     ax[1].set_ylabel("Interest [%]")
-    ax[1].set_xlim(df_data.index[0], df_data.index[-1])
+    ax[1].set_xlim(data.index[0], data.index[-1])
     ax[1].legend(words)
     theme.style_primary_axis(ax[0])
     theme.style_primary_axis(ax[1])
@@ -154,8 +151,8 @@ def display_correlation_interest(
 
 @log_start_end(log=logger)
 def display_regions(
-    ticker: str,
-    num: int = 5,
+    symbol: str,
+    limit: int = 5,
     export: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
 ):
@@ -163,40 +160,36 @@ def display_regions(
 
     Parameters
     ----------
-    ticker : str
-        Ticker
-    num: int
+    symbol : str
+        Ticker symbol
+    limit: int
         Number of regions to show
     export: str
         Format to export data
     external_axes : Optional[List[plt.Axes]], optional
         External axes (1 axis is expected in the list), by default None
     """
-    df_interest_region = google_model.get_regions(ticker)
+    df_interest_region = google_model.get_regions(symbol)
 
     # This plot has 1 axis
     if external_axes is None:
         _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
-    else:
-        if len(external_axes) != 1:
-            logger.error("Expected list of one axis item.")
-            console.print("[red]Expected list of one axis item./n[/red]")
-            return
+    elif is_valid_axes_count(external_axes, 1):
         (ax,) = external_axes
+    else:
+        return
 
     if df_interest_region.empty:
         console.print("No region data found.")
         console.print("")
         return
 
-    df_interest_region = df_interest_region.sort_values([ticker], ascending=False).head(
-        num
-    )
-    df = df_interest_region.sort_values([ticker], ascending=True)
+    df_interest_region = df_interest_region.head(limit)
+    df = df_interest_region.sort_values([symbol], ascending=True)
 
-    ax.set_title(f"Top's regions interest on {ticker}")
+    ax.set_title(f"Top's regions interest on {symbol}")
     ax.barh(
-        y=df.index, width=df[ticker], color=theme.get_colors(reverse=True), zorder=3
+        y=df.index, width=df[symbol], color=theme.get_colors(reverse=True), zorder=3
     )
     ax.set_xlabel("Interest [%]")
     ax.set_ylabel("Region")
@@ -209,55 +202,55 @@ def display_regions(
 
 
 @log_start_end(log=logger)
-def display_queries(ticker: str, num: int = 5, export: str = ""):
+def display_queries(symbol: str, limit: int = 5, export: str = ""):
     """Print top related queries with this stock's query. [Source: Google]
 
     Parameters
     ----------
-    ticker : str
-        Ticker
-    num: int
+    symbol : str
+        Ticker symbol
+    limit: int
         Number of regions to show
     export: str
         Format to export data
     """
 
-    df_related_queries = google_model.get_queries(ticker)
+    df_related_queries = google_model.get_queries(symbol)
     df = df_related_queries.copy()
-    df_related_queries = df_related_queries[ticker]["top"].head(num)
+    df_related_queries = df_related_queries[symbol]["top"].head(limit)
     df_related_queries["value"] = df_related_queries["value"].apply(
         lambda x: str(x) + "%"
     )
     print_rich_table(
         df_related_queries,
         headers=list(df_related_queries.columns),
-        title=f"Top {ticker}'s related queries",
+        title=f"Top {symbol}'s related queries",
     )
-    console.print("")
+
     export_data(export, os.path.dirname(os.path.abspath(__file__)), "queries", df)
 
 
 @log_start_end(log=logger)
-def display_rise(ticker: str, num: int, export: str = ""):
+def display_rise(symbol: str, limit: int = 10, export: str = ""):
     """Print top rising related queries with this stock's query. [Source: Google]
 
     Parameters
     ----------
-    ticker : str
-        Ticker
-    num: int
+    symbol : str
+        Ticker symbol
+    limit: int
         Number of regions to show
     export: str
         Format to export data
     """
-    df_related_queries = google_model.get_rise(ticker)
-    df = df_related_queries.copy()
-    df_related_queries = df_related_queries.head(num)
+    df_related_queries = google_model.get_rise(symbol)
 
     print_rich_table(
-        df_related_queries,
+        df_related_queries.head(limit),
         headers=list(df_related_queries.columns),
-        title=f"Top rising {ticker}'s related queries",
+        title=f"Top rising {symbol}'s related queries",
     )
-    console.print("")
-    export_data(export, os.path.dirname(os.path.abspath(__file__)), "rise", df)
+
+    export_data(
+        export, os.path.dirname(os.path.abspath(__file__)), "rise", df_related_queries
+    )

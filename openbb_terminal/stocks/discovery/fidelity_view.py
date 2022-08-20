@@ -9,7 +9,6 @@ import pandas as pd
 
 from openbb_terminal.decorators import log_start_end
 from openbb_terminal.helper_funcs import export_data, print_rich_table
-from openbb_terminal.rich_config import console
 from openbb_terminal.stocks.discovery import fidelity_model
 from openbb_terminal import rich_config
 
@@ -65,12 +64,12 @@ def lambda_price_change_color_red_green(val: str) -> str:
 
 
 @log_start_end(log=logger)
-def orders_view(num: int, export: str):
+def orders_view(limit: int = 5, export: str = ""):
     """Prints last N orders by Fidelity customers. [Source: Fidelity]
 
     Parameters
     ----------
-    num: int
+    limit: int
         Number of stocks to display
     export : str
         Export dataframe data to csv,json,xlsx file
@@ -87,7 +86,7 @@ def orders_view(num: int, export: str):
             lambda_price_change_color_red_green
         )
 
-    df_orders = df_orders.head(n=num).iloc[:, :-1]
+    df_orders = df_orders.head(n=limit).iloc[:, :-1]
 
     print_rich_table(
         df_orders,
@@ -95,7 +94,6 @@ def orders_view(num: int, export: str):
         show_index=False,
         title=f"{order_header}:",
     )
-    console.print("")
 
     export_data(
         export,

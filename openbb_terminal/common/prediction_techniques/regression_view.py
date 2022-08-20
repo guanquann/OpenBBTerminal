@@ -23,6 +23,7 @@ from openbb_terminal.helper_funcs import (
     get_next_stock_market_days,
     patch_pandas_text_adjustment,
     plot_autoscale,
+    is_valid_axes_count,
 )
 from openbb_terminal.rich_config import console
 from openbb_terminal import rich_config
@@ -42,7 +43,7 @@ def display_regression(
     n_input: int,
     n_predict: int,
     n_jumps: int,
-    s_end_date: str = "",
+    end_date: str = "",
     export: str = "",
     time_res: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
@@ -63,7 +64,7 @@ def display_regression(
         Length of prediction sequence
     n_jumps : int
         Number of jumps in data
-    s_end_date : str, optional
+    end_date : str, optional
         Start date for backtesting
     export : str, optional
         Format for exporting figures
@@ -73,18 +74,18 @@ def display_regression(
         External axes (1 axis is expected in the list), by default None
     """
     # BACKTESTING
-    if s_end_date:
+    if end_date:
         if not time_res:
             future_index = get_next_stock_market_days(
-                last_stock_day=s_end_date, n_next_days=n_predict
+                last_stock_day=end_date, n_next_days=n_predict
             )
         else:
             future_index = pd.date_range(
-                s_end_date, periods=n_predict + 1, freq=time_res
+                end_date, periods=n_predict + 1, freq=time_res
             )[1:]
 
         df_future = values[future_index[0] : future_index[-1]]  # noqa: E203
-        values = values[:s_end_date]  # type: ignore
+        values = values[:end_date]  # type: ignore
 
     l_predictions, _ = regression_model.get_regression_model(
         list(values.values), poly_order, n_input, n_predict, n_jumps
@@ -104,23 +105,29 @@ def display_regression(
 
     # Plotting
 
-    # This plot has 1 axes
+    # This plot has 1 axis
     if external_axes is None:
         _, ax1 = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
+    elif end_date and not is_valid_axes_count(
+        external_axes,
+        3,
+        prefix_text="If there is end_date",
+        suffix_text="when backtesting",
+    ):
+        return
+    elif not end_date and not is_valid_axes_count(
+        external_axes,
+        1,
+        prefix_text="If there is no end_date",
+        suffix_text="when backtesting",
+    ):
+        return
     else:
-        if (not s_end_date and len(external_axes) != 1) or (
-            s_end_date and len(external_axes) != 3
-        ):
-            logger.error("Expected list of 1 axis or 3 axes when backtesting.")
-            console.print(
-                "[red]Expected list of 1 axis or 3 axes when backtesting./n[/red]"
-            )
-            return
         ax1 = external_axes[0]
 
     ax1.plot(values.index, values)
     # BACKTESTING
-    if s_end_date:
+    if end_date:
         ax1.set_title(
             f"BACKTESTING: Regression (polynomial {poly_order}) on {dataset} - {n_predict} step prediction",
             fontsize=12,
@@ -143,7 +150,7 @@ def display_regression(
     ax1.vlines(values.index[-1], ymin, ymax, linestyle="--")
 
     # BACKTESTING
-    if s_end_date:
+    if end_date:
         ax1.plot(
             df_future.index,
             df_future,
@@ -161,7 +168,6 @@ def display_regression(
         )
 
     theme.style_primary_axis(ax1)
-
     if external_axes is None:
         theme.visualize_output()
 
@@ -169,19 +175,17 @@ def display_regression(
     console.print("")
 
     # BACKTESTING
-    if s_end_date:
-        # This plot has 1 axes
+    if end_date:
+        # This plot has 3 axes
         if external_axes is None:
             _, axes = plt.subplots(
                 2, 1, sharex=True, figsize=plot_autoscale(), dpi=PLOT_DPI
             )
             (ax2, ax3) = axes
-        else:
-            if len(external_axes) != 3:
-                logger.error("Expected list of three axis items.")
-                console.print("[red]Expected list of 3 axis items./n[/red]")
-                return
+        elif is_valid_axes_count(external_axes, 3):
             (_, ax2, ax3) = external_axes
+        else:
+            return
 
         ax2.plot(
             df_future.index,

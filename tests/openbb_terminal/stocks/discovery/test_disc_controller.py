@@ -16,7 +16,7 @@ from openbb_terminal.stocks.discovery import disc_controller
 @pytest.mark.parametrize(
     "queue, expected",
     [
-        (["load", "help"], []),
+        (["load", "help"], ["help"]),
         (["quit", "help"], ["help"]),
     ],
 )
@@ -66,7 +66,7 @@ def test_menu_without_queue_completion(mocker):
 
     result_menu = disc_controller.DiscoveryController(queue=None).menu()
 
-    assert result_menu == []
+    assert result_menu == ["help"]
 
 
 @pytest.mark.vcr(record_mode="none")
@@ -111,7 +111,7 @@ def test_menu_without_queue_sys_exit(mock_input, mocker):
 
     result_menu = disc_controller.DiscoveryController(queue=None).menu()
 
-    assert result_menu == []
+    assert result_menu == ["help"]
 
 
 @pytest.mark.vcr(record_mode="none")
@@ -198,15 +198,15 @@ def test_call_func_expect_queue(expected_queue, queue, func):
             "call_active",
             "yahoofinance_view.display_active",
             ["--limit=5", "--export=csv"],
-            {"num_stocks": 5, "export": "csv"},
+            {"limit": 5, "export": "csv"},
         ),
         (
             "call_arkord",
             "ark_view.ark_orders_view",
             ["--limit=5", "--sortby=date", "--fund=ARKK", "--export=csv"],
             {
-                "num": 5,
-                "sort_col": ["date"],
+                "limit": 5,
+                "sortby": ["date"],
                 "ascending": False,
                 "buys_only": False,
                 "sells_only": False,
@@ -221,7 +221,7 @@ def test_call_func_expect_queue(expected_queue, queue, func):
                 "--limit=5",
                 "--export=csv",
             ],
-            {"num_stocks": 5, "export": "csv"},
+            {"limit": 5, "export": "csv"},
         ),
         (
             "call_cnews",
@@ -231,7 +231,7 @@ def test_call_func_expect_queue(expected_queue, queue, func):
                 "--limit=5",
                 "--export=csv",
             ],
-            {"news_type": "technology", "num": 5, "export": "csv"},
+            {"news_type": "technology", "limit": 5, "export": "csv"},
         ),
         (
             "call_fipo",
@@ -246,37 +246,37 @@ def test_call_func_expect_queue(expected_queue, queue, func):
                 "--limit=5",
                 "--export=csv",
             ],
-            {"num": 5, "export": "csv"},
+            {"limit": 5, "export": "csv"},
         ),
         (
             "call_gainers",
             "yahoofinance_view.display_gainers",
             ["--limit=5", "--export=csv"],
-            {"num_stocks": 5, "export": "csv"},
+            {"limit": 5, "export": "csv"},
         ),
         (
             "call_gtech",
             "yahoofinance_view.display_gtech",
             ["--limit=5", "--export=csv"],
-            {"num_stocks": 5, "export": "csv"},
+            {"limit": 5, "export": "csv"},
         ),
         (
             "call_hotpenny",
             "shortinterest_view.hot_penny_stocks",
             ["--limit=5", "--export=csv"],
-            {"num": 5, "export": "csv"},
+            {"limit": 5, "export": "csv", "source": "yf"},
         ),
         (
             "call_losers",
             "yahoofinance_view.display_losers",
             ["--limit=5", "--export=csv"],
-            {"num_stocks": 5, "export": "csv"},
+            {"limit": 5, "export": "csv"},
         ),
         (
             "call_lowfloat",
             "shortinterest_view.low_float",
             ["--limit=5", "--export=csv"],
-            {"num": 5, "export": "csv"},
+            {"limit": 5, "export": "csv"},
         ),
         (
             "call_pipo",
@@ -288,7 +288,7 @@ def test_call_func_expect_queue(expected_queue, queue, func):
             "call_rtat",
             "nasdaq_view.display_top_retail",
             ["--limit=5", "--export=csv"],
-            {"n_days": 5, "export": "csv"},
+            {"limit": 5, "export": "csv"},
         ),
         (
             "call_trending",
@@ -300,7 +300,7 @@ def test_call_func_expect_queue(expected_queue, queue, func):
             ],
             {
                 "article_id": 123,
-                "num": 5,
+                "limit": 5,
                 "export": "csv",
             },
         ),
@@ -308,19 +308,19 @@ def test_call_func_expect_queue(expected_queue, queue, func):
             "call_ugs",
             "yahoofinance_view.display_ugs",
             ["--limit=5", "--export=csv"],
-            {"num_stocks": 5, "export": "csv"},
+            {"limit": 5, "export": "csv"},
         ),
         (
             "call_ulc",
             "yahoofinance_view.display_ulc",
             ["--limit=5", "--export=csv"],
-            {"num_stocks": 5, "export": "csv"},
+            {"limit": 5, "export": "csv"},
         ),
         (
             "call_upcoming",
             "seeking_alpha_view.upcoming_earning_release_dates",
             ["--n_pages=10", "--limit=5", "--export=csv"],
-            {"num_pages": 10, "num_earnings": 5, "export": "csv"},
+            {"num_pages": 10, "limit": 5, "export": "csv"},
         ),
     ],
 )
@@ -366,7 +366,7 @@ def test_call_func(tested_func, mocked_func, other_args, called_with, mocker):
 )
 def test_call_func_no_parser(func, mocker):
     mocker.patch(
-        "openbb_terminal.stocks.discovery.disc_controller.parse_known_args_and_warn",
+        "openbb_terminal.stocks.discovery.disc_controller.DiscoveryController.parse_known_args_and_warn",
         return_value=None,
     )
     controller = disc_controller.DiscoveryController()
@@ -374,4 +374,4 @@ def test_call_func_no_parser(func, mocker):
     func_result = getattr(controller, func)(other_args=list())
     assert func_result is None
     assert controller.queue == []
-    getattr(disc_controller, "parse_known_args_and_warn").assert_called_once()
+    controller.parse_known_args_and_warn.assert_called_once()

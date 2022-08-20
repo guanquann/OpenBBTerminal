@@ -1,6 +1,8 @@
 crypto
 load btc
 dd
+fundrate
+oi
 nonzero
 info
 market
@@ -12,4 +14,17 @@ score
 dev
 bc
 mcapdom
+mt --list
+rm
+tk
+pi
+team
+inv
+gov
+fr
+links
+gh
+news
+ob
+trades
 exit

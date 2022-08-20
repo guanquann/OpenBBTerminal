@@ -13,6 +13,7 @@ from openbb_terminal.helper_funcs import (
     export_data,
     plot_autoscale,
     print_rich_table,
+    is_valid_axes_count,
 )
 from openbb_terminal.rich_config import console
 
@@ -37,7 +38,7 @@ def display_anchor_data(
     address : str
         Terra address. Valid terra addresses start with 'terra'
     show_transactions : bool
-        Flag to show history of transactions in Anchor protocol for address specified. Default False
+        Flag to show history of transactions in Anchor protocol for address. Default False
     export : str
         Export dataframe data to csv,json,xlsx file
     external_axes : Optional[List[plt.Axes]], optional
@@ -49,15 +50,11 @@ def display_anchor_data(
     # This plot has 1 axis
     if not external_axes:
         _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
-    else:
-        if len(external_axes) != 1:
-            logger.error("Expected list of one axis item.")
-            console.print("[red]Expected list of one axis item./n[/red]")
-            return
+    elif is_valid_axes_count(external_axes, 1):
         (ax,) = external_axes
-    print("")
-    console.print(stats_str)
-    print("")
+    else:
+        return
+    console.print(f"\n{stats_str}\n")
 
     if show_transactions:
         print_rich_table(

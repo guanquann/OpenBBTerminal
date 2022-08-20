@@ -6,7 +6,7 @@ import pytest
 import pandas as pd
 
 # IMPORTATION INTERNAL
-from openbb_terminal.stocks.options import syncretism_view
+from openbb_terminal.stocks.options.screen import syncretism_view
 
 
 @pytest.fixture(scope="module")
@@ -28,7 +28,9 @@ def vcr_config():
     ["high_IV", ""],
 )
 def test_view_available_presets(preset):
-    presets_path = os.path.join(os.path.dirname(syncretism_view.__file__), "presets/")
+    presets_path = os.path.join(
+        os.path.dirname(syncretism_view.__file__), "..", "presets/"
+    )
     syncretism_view.view_available_presets(
         preset=preset,
         presets_path=presets_path,
@@ -41,11 +43,13 @@ def test_view_available_presets(preset):
 def test_view_screener_output(mocker):
     # MOCK VISUALIZE_OUTPUT
     mocker.patch(target="openbb_terminal.helper_classes.TerminalStyle.visualize_output")
-    presets_path = os.path.join(os.path.dirname(syncretism_view.__file__), "presets/")
+    presets_path = os.path.join(
+        os.path.dirname(syncretism_view.__file__), "..", "presets/"
+    )
     syncretism_view.view_screener_output(
         preset="high_IV",
         presets_path=presets_path,
-        n_show=5,
+        limit=5,
         export="",
     )
 
@@ -54,14 +58,16 @@ def test_view_screener_output(mocker):
 @pytest.mark.record_stdout
 def test_view_screener_output_error(mocker):
     mocker.patch(
-        target="openbb_terminal.stocks.options.syncretism_view.syncretism_model.get_screener_output",
+        target="openbb_terminal.stocks.options.screen.syncretism_view.syncretism_model.get_screener_output",
         return_value=(pd.DataFrame(), "MOCK_ERROR_MESSAGE"),
     )
-    presets_path = os.path.join(os.path.dirname(syncretism_view.__file__), "presets/")
+    presets_path = os.path.join(
+        os.path.dirname(syncretism_view.__file__), "..", "presets/"
+    )
     syncretism_view.view_screener_output(
         preset="high_IV",
         presets_path=presets_path,
-        n_show=5,
+        limit=5,
         export="",
     )
 
@@ -72,13 +78,13 @@ def test_view_historical_greeks(mocker):
     mocker.patch(target="openbb_terminal.helper_classes.TerminalStyle.visualize_output")
 
     syncretism_view.view_historical_greeks(
-        ticker="PM",
+        symbol="PM",
         expiry="2022-01-07",
         chain_id="PM220107P00090000",
         strike=90,
         greek="theta",
         put=True,
         raw=True,
-        n_show=5,
+        limit=5,
         export="",
     )

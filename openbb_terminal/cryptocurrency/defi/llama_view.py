@@ -21,8 +21,8 @@ from openbb_terminal.helper_funcs import (
     lambda_long_number_format,
     plot_autoscale,
     print_rich_table,
+    is_valid_axes_count,
 )
-from openbb_terminal.rich_config import console
 
 logger = logging.getLogger(__name__)
 
@@ -43,21 +43,16 @@ def display_grouped_defi_protocols(
     external_axes : Optional[List[plt.Axes]], optional
         External axes (1 axis is expected in the list), by default None
     """
-    df = llama_model.get_defi_protocols()
-    df = df.sort_values("tvl", ascending=False).head(num)
-
-    df = df.set_index("name")
+    df = llama_model.get_defi_protocols(num)
     chains = df.groupby("chain").size().index.values.tolist()
 
     # This plot has 1 axis
     if not external_axes:
         _, ax = plt.subplots(figsize=(14, 8), dpi=PLOT_DPI)
-    else:
-        if len(external_axes) != 1:
-            logger.error("Expected list of one axis item.")
-            console.print("[red]Expected list of one axis item./n[/red]")
-            return
+    elif is_valid_axes_count(external_axes, 1):
         (ax,) = external_axes
+    else:
+        return
 
     colors = iter(cfg.theme.get_colors(reverse=True))
 
@@ -99,10 +94,14 @@ def display_grouped_defi_protocols(
 
 @log_start_end(log=logger)
 def display_defi_protocols(
-    top: int, sortby: str, descend: bool, description: bool, export: str = ""
+    top: int,
+    sortby: str,
+    ascend: bool = False,
+    description: bool = False,
+    export: str = "",
 ) -> None:
-    """Display information about listed DeFi protocols, their current TVL and changes to it in the last hour/day/week.
-    [Source: https://docs.llama.fi/api]
+    """Display information about listed DeFi protocols, their current TVL and changes to it in
+    the last hour/day/week. [Source: https://docs.llama.fi/api]
 
     Parameters
     ----------
@@ -110,7 +109,7 @@ def display_defi_protocols(
         Number of records to display
     sortby: str
         Key by which to sort data
-    descend: bool
+    ascend: bool
         Flag to sort data descending
     description: bool
         Flag to display description of protocol
@@ -121,7 +120,7 @@ def display_defi_protocols(
     df = llama_model.get_defi_protocols()
     df_data = df.copy()
 
-    df = df.sort_values(by=sortby, ascending=descend)
+    df = df.sort_values(by=sortby, ascending=ascend)
     df = df.drop(columns="chain")
 
     df["tvl"] = df["tvl"].apply(lambda x: lambda_long_number_format(x))
@@ -151,7 +150,6 @@ def display_defi_protocols(
     )
 
     print_rich_table(df.head(top), headers=list(df.columns), show_index=False)
-    console.print("")
 
     export_data(
         export,
@@ -183,12 +181,10 @@ def display_historical_tvl(
     # This plot has 1 axis
     if not external_axes:
         _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
-    else:
-        if len(external_axes) != 1:
-            logger.error("Expected list of one axis item.")
-            console.print("[red]Expected list of one axis item./n[/red]")
-            return
+    elif is_valid_axes_count(external_axes, 1):
         (ax,) = external_axes
+    else:
+        return
 
     available_protocols = read_data_file("defillama_dapps.json")
 
@@ -222,7 +218,7 @@ def display_historical_tvl(
 
 @log_start_end(log=logger)
 def display_defi_tvl(
-    top: int,
+    top: int = 5,
     export: str = "",
     external_axes: Optional[List[plt.Axes]] = None,
 ) -> None:
@@ -232,7 +228,7 @@ def display_defi_tvl(
     Parameters
     ----------
     top: int
-        Number of records to display
+        Number of records to display, by default 5
     export : str
         Export dataframe data to csv,json,xlsx file
     external_axes : Optional[List[plt.Axes]], optional
@@ -242,12 +238,10 @@ def display_defi_tvl(
     # This plot has 1 axis
     if not external_axes:
         _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
-    else:
-        if len(external_axes) != 1:
-            logger.error("Expected list of one axis item.")
-            console.print("[red]Expected list of one axis item./n[/red]")
-            return
+    elif is_valid_axes_count(external_axes, 1):
         (ax,) = external_axes
+    else:
+        return
 
     df = llama_model.get_defi_tvl()
     df_data = df.copy()

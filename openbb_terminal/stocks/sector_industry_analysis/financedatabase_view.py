@@ -18,6 +18,7 @@ from openbb_terminal.helper_funcs import (
     export_data,
     plot_autoscale,
     print_rich_table,
+    is_valid_axes_count,
 )
 from openbb_terminal.rich_config import console
 from openbb_terminal.stocks.sector_industry_analysis import financedatabase_model
@@ -27,12 +28,12 @@ logger = logging.getLogger(__name__)
 
 @log_start_end(log=logger)
 def display_bars_financials(
-    finance_key: str,
-    finance_metric: str,
-    country: str,
-    sector: str,
-    industry: str,
-    marketcap: str = "",
+    finance_key: str = "financialData",
+    finance_metric: str = "ebitda",
+    country: str = "United States",
+    sector: str = "Communication Services",
+    industry: str = "Internet Content & Information",
+    marketcap: str = "Mega Cap",
     exclude_exchanges: bool = True,
     limit: int = 10,
     export: str = "",
@@ -50,12 +51,12 @@ def display_bars_financials(
         Select finance metric from Yahoo Finance (e.g. operatingCashflow, revenueGrowth, ebitda, freeCashflow)
     country: str
         Search by country to find stocks matching the criteria.
-    sector : str
+    sector: str
         Search by sector to find stocks matching the criteria.
-    industry : str
+    industry: str
         Search by industry to find stocks matching the criteria.
-    marketcap : str
-        Select stocks based on the market cap.
+    marketcap: str
+        Select stocks based on the market cap from Mega Cap, Large Cap, Mid Cap, Small Cap, Micro Cap, Nano Cap
     exclude_exchanges: bool
         When you wish to include different exchanges use this boolean.
     limit: int
@@ -143,13 +144,11 @@ def display_bars_financials(
             # This plot has 1 axis
             if not external_axes:
                 _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
-            else:
-                if len(external_axes) != 1:
-                    logger.error("Expected list of one axis item.")
-                    console.print("[red]Expected list of one axis item./n[/red]")
-                    # set returns statement to be compatible with others
-                    return dict(), list()
+            elif is_valid_axes_count(external_axes, 1):
                 (ax,) = external_axes
+            else:
+                # set returns statement to be compatible with others
+                return dict(), list()
 
             magnitude = 0
             while max(company_metric) > 1_000 or abs(min(company_metric)) > 1_000:
@@ -209,7 +208,7 @@ def display_bars_financials(
 
             labels = ax.get_xticks().tolist()
             ax.set_xticks(labels)
-            ax.set_xticklabels([f"{label}{unit}" for label in labels])
+            ax.set_xticklabels([f"{label:.2f}{unit}" for label in labels])
 
             theme.style_primary_axis(ax)
 
@@ -237,8 +236,8 @@ def display_bars_financials(
 
 @log_start_end(log=logger)
 def display_companies_per_sector_in_country(
-    country: str,
-    mktcap: str = "",
+    country: str = "United States",
+    mktcap: str = "Large",
     exclude_exchanges: bool = True,
     export: str = "",
     raw: bool = False,
@@ -340,12 +339,10 @@ def display_companies_per_sector_in_country(
             # This plot has 1 axis
             if not external_axes:
                 _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
-            else:
-                if len(external_axes) != 1:
-                    logger.error("Expected list of one axis item.")
-                    console.print("[red]Expected list of one axis item./n[/red]")
-                    return
+            elif is_valid_axes_count(external_axes, 1):
                 (ax,) = external_axes
+            else:
+                return
 
             plt.pie(
                 values,
@@ -366,7 +363,6 @@ def display_companies_per_sector_in_country(
             )
         else:
             console.print("No sector found. No pie chart will be depicted.")
-    console.print("")
 
     export_data(
         export,
@@ -378,8 +374,8 @@ def display_companies_per_sector_in_country(
 
 @log_start_end(log=logger)
 def display_companies_per_industry_in_country(
-    country: str,
-    mktcap: str = "",
+    country: str = "United States",
+    mktcap: str = "Large",
     exclude_exchanges: bool = True,
     export: str = "",
     raw: bool = False,
@@ -491,12 +487,10 @@ def display_companies_per_industry_in_country(
             # This plot has 1 axis
             if not external_axes:
                 _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
-            else:
-                if len(external_axes) != 1:
-                    logger.error("Expected list of one axis item.")
-                    console.print("[red]Expected list of one axis item./n[/red]")
-                    return
+            elif is_valid_axes_count(external_axes, 1):
                 (ax,) = external_axes
+            else:
+                return
 
             ax.pie(
                 values,
@@ -530,8 +524,8 @@ def display_companies_per_industry_in_country(
 
 @log_start_end(log=logger)
 def display_companies_per_industry_in_sector(
-    sector: str,
-    mktcap: str = "",
+    sector: str = "Technology",
+    mktcap: str = "Large",
     exclude_exchanges: bool = True,
     export: str = "",
     raw: bool = False,
@@ -645,12 +639,10 @@ def display_companies_per_industry_in_sector(
             # This plot has 1 axis
             if not external_axes:
                 _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
-            else:
-                if len(external_axes) != 1:
-                    logger.error("Expected list of one axis item.")
-                    console.print("[red]Expected list of one axis item./n[/red]")
-                    return
+            elif is_valid_axes_count(external_axes, 1):
                 (ax,) = external_axes
+            else:
+                return
 
             ax.pie(
                 values,
@@ -671,7 +663,6 @@ def display_companies_per_industry_in_sector(
             )
         else:
             console.print("No industry found. No pie chart will be depicted.")
-    console.print("")
 
     export_data(
         export,
@@ -683,8 +674,8 @@ def display_companies_per_industry_in_sector(
 
 @log_start_end(log=logger)
 def display_companies_per_country_in_sector(
-    sector: str,
-    mktcap: str = "",
+    sector: str = "Technology",
+    mktcap: str = "Large",
     exclude_exchanges: bool = True,
     export: str = "",
     raw: bool = False,
@@ -696,8 +687,8 @@ def display_companies_per_country_in_sector(
 
     Parameters
     ----------
-    country: str
-        Select country to get number of companies by each country
+    sector: str
+        Select sector to get number of companies by each country
     mktcap: str
         Select market cap of companies to consider from Small, Mid and Large
     exclude_exchanges : bool
@@ -791,12 +782,10 @@ def display_companies_per_country_in_sector(
             # This plot has 1 axis
             if not external_axes:
                 _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
-            else:
-                if len(external_axes) != 1:
-                    logger.error("Expected list of one axis item.")
-                    console.print("[red]Expected list of one axis item./n[/red]")
-                    return
+            elif is_valid_axes_count(external_axes, 1):
                 (ax,) = external_axes
+            else:
+                return
 
             ax.pie(
                 values,
@@ -829,8 +818,8 @@ def display_companies_per_country_in_sector(
 
 @log_start_end(log=logger)
 def display_companies_per_country_in_industry(
-    industry: str,
-    mktcap: str = "",
+    industry: str = "Internet Content & Information",
+    mktcap: str = "Large",
     exclude_exchanges: bool = True,
     export: str = "",
     raw: bool = False,
@@ -842,8 +831,8 @@ def display_companies_per_country_in_industry(
 
     Parameters
     ----------
-    country: str
-        Select country to get number of companies by each country
+    industry: str
+        Select industry to get number of companies by each country
     mktcap: str
         Select market cap of companies to consider from Small, Mid and Large
     exclude_exchanges : bool
@@ -937,12 +926,10 @@ def display_companies_per_country_in_industry(
             # This plot has 1 axis
             if not external_axes:
                 _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
-            else:
-                if len(external_axes) != 1:
-                    logger.error("Expected list of one axis item.")
-                    console.print("[red]Expected list of one axis item./n[/red]")
-                    return
+            elif is_valid_axes_count(external_axes, 1):
                 (ax,) = external_axes
+            else:
+                return
 
             ax.pie(
                 values,

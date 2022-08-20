@@ -30,7 +30,7 @@ from openbb_terminal.forex.oanda.oanda_model import (
     pending_orders_request,
     positionbook_plot_data_request,
 )
-from openbb_terminal.helper_funcs import plot_autoscale
+from openbb_terminal.helper_funcs import plot_autoscale, is_valid_axes_count
 from openbb_terminal.rich_config import console
 
 logger = logging.getLogger(__name__)
@@ -256,9 +256,6 @@ def get_pending_orders(accountID: str):
         console.print("No data was returned from Oanda.\n")
 
 
-# Pylint raises no-member error because the df_trades can be either
-# a dataframe or a boolean (False) value that has no .empty and no .to_string
-# pylint: disable=no-member
 @log_start_end(log=logger)
 @check_api_key(["OANDA_ACCOUNT", "OANDA_TOKEN", "OANDA_ACCOUNT_TYPE"])
 def get_open_trades(accountID: str):
@@ -270,7 +267,7 @@ def get_open_trades(accountID: str):
         Oanda user account ID
     """
     df_trades = open_trades_request(accountID)
-    if df_trades is not False and not df_trades.empty:
+    if isinstance(df_trades, pd.DataFrame) and not df_trades.empty:
         console.print(df_trades.to_string(index=False))
         console.print("")
     elif df_trades is not False and df_trades.empty:
@@ -307,8 +304,8 @@ def close_trade(accountID: str, orderID: str, units: Union[int, None]):
 @check_api_key(["OANDA_ACCOUNT", "OANDA_TOKEN", "OANDA_ACCOUNT_TYPE"])
 def show_candles(
     instrument: str,
-    granularity: str,
-    candlecount: int,
+    granularity: str = "D",
+    candlecount: int = 180,
     additional_charts: Optional[Dict[str, bool]] = None,
     external_axes: Optional[List[plt.Axes]] = None,
 ):
@@ -321,7 +318,9 @@ def show_candles(
     instrument : str
         The loaded currency pair
     granularity : str, optional
-        Data granularity
+        The timeframe to get for the candle chart. Seconds: S5, S10, S15, S30
+        Minutes: M1, M2, M4, M5, M10, M15, M30 Hours: H1, H2, H3, H4, H6, H8, H12
+        Day (default): D, Week: W Month: M,
     candlecount : int, optional
         Limit for the number of data points
     additional_charts : Dict[str, bool]
@@ -357,16 +356,7 @@ def show_candles(
         "warn_too_much_data": 10000,
     }
     # This plot has 2 axes
-    if external_axes is not None:
-        if len(external_axes) != 2:
-            logger.error("Expected list of 2 axis items")
-            console.print("[red]Expected list of 2 axis items./n[/red]")
-            return
-        ax, volume = external_axes
-        candle_chart_kwargs["ax"] = ax
-        candle_chart_kwargs["volume"] = volume
-        mpf.plot(df_candles, **candle_chart_kwargs)
-    else:
+    if not external_axes:
         candle_chart_kwargs["returnfig"] = True
         candle_chart_kwargs["figratio"] = (10, 7)
         candle_chart_kwargs["figscale"] = 1.10
@@ -390,11 +380,18 @@ def show_candles(
         else:
             logger.error("Data not found")
             console.print("[red]Data not found[/red]\n")
+    elif is_valid_axes_count(external_axes, 2):
+        ax, volume = external_axes
+        candle_chart_kwargs["ax"] = ax
+        candle_chart_kwargs["volume"] = volume
+        mpf.plot(df_candles, **candle_chart_kwargs)
+    else:
+        return
 
 
 @log_start_end(log=logger)
 @check_api_key(["OANDA_ACCOUNT", "OANDA_TOKEN", "OANDA_ACCOUNT_TYPE"])
-def calendar(instrument: str, days: int):
+def calendar(instrument: str, days: int = 7):
     """View calendar of significant events.
 
     Parameters
@@ -514,7 +511,7 @@ def book_plot(
     book_type : str
         Order book type
     external_axes : Optional[List[plt.Axes]], optional
-        External axes (1 axis are expected in the list), by default None
+        External axes (1 axis is expected in the list), by default None
     """
     df = df.apply(pd.to_numeric)
     df["shortCountPercent"] = df["shortCountPercent"] * -1
@@ -525,12 +522,10 @@ def book_plot(
     # This plot has 1 axis
     if not external_axes:
         _, ax = plt.subplots(figsize=plot_autoscale(), dpi=PLOT_DPI)
-    else:
-        if len(external_axes) != 1:
-            logger.error("Expected list of one axis item.")
-            console.print("[red]Expected list of one axis item./n[/red]")
-            return
+    elif is_valid_axes_count(external_axes, 1):
         (ax,) = external_axes
+    else:
+        return
 
     ax.set_xlim(-axis_origin, +axis_origin)
 

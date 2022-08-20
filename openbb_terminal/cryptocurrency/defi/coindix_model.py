@@ -4,14 +4,19 @@ __docformat__ = "numpy"
 import logging
 from typing import Optional
 
+import urllib3
 import pandas as pd
 import requests
 
 from openbb_terminal.decorators import log_start_end
+from openbb_terminal.helper_funcs import get_user_agent, lambda_long_number_format
+
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
-VAULTS_FILTERS = ["name", "chain", "protocol", "apy", "tvl", "risk", "link"]
+VAULTS_FILTERS = ["name", "chain", "protocol", "apy", "tvl", "link"]
 CHAINS = [
     "ethereum",
     "polygon",
@@ -31,6 +36,9 @@ CHAINS = [
     "defichain",
     "solana",
     "optimism",
+    "kusama",
+    "metis",
+    "osmosis",
 ]
 PROTOCOLS = [
     "aave",
@@ -61,6 +69,8 @@ PROTOCOLS = [
     "uniswap",
     "venus",
     "yearn",
+    "osmosis",
+    "tulip",
 ]
 VAULT_KINDS = [
     "lp",
@@ -68,22 +78,6 @@ VAULT_KINDS = [
     "noimploss",
     "stable",
 ]
-
-
-def _lambda_risk_mapper(risk_level: int) -> str:
-    """Helper methods
-    Parameters
-    ----------
-    risk_level: int
-        number from range 0-4 represents risk factor for given vault
-    Returns
-    -------
-    string:
-        text representation of risk
-    """
-
-    mappings = {0: "Non Eligible", 1: "Least", 2: "Low", 3: "Medium", 4: "High"}
-    return mappings.get(risk_level, "Non Eligible")
 
 
 @log_start_end(log=logger)
@@ -114,6 +108,8 @@ def get_defi_vaults(
     chain: Optional[str] = None,
     protocol: Optional[str] = None,
     kind: Optional[str] = None,
+    ascend: bool = True,
+    sortby: str = "apy",
 ) -> pd.DataFrame:
     """Get DeFi Vaults Information. DeFi Vaults are pools of funds with an assigned strategy which main goal is to
     maximize returns of its crypto assets. [Source: https://coindix.com/]
@@ -142,8 +138,11 @@ def get_defi_vaults(
         Top 100 DeFi Vaults for given chain/protocol sorted by APY.
     """
 
+    headers = {"User-Agent": get_user_agent()}
     params = _prepare_params(chain=chain, protocol=protocol, kind=kind)
-    response = requests.get("https://apiv2.coindix.com/search", params=params)
+    response = requests.get(
+        "https://apiv2.coindix.com/search", headers=headers, params=params, verify=False
+    )
     if not 200 <= response.status_code < 300:
         raise Exception(f"Coindix api exception: {response.text}")
 
@@ -151,9 +150,16 @@ def get_defi_vaults(
         data = response.json()["data"]
         if len(data) == 0:
             return pd.DataFrame()
-        df = pd.DataFrame(data)[VAULTS_FILTERS].fillna("NA")
-        df["risk"] = df["risk"].apply(lambda x: _lambda_risk_mapper(x))
-        return df
+        df = pd.DataFrame(data)[VAULTS_FILTERS]
     except Exception as e:
         logger.exception(e)
         raise ValueError(f"Invalid Response: {response.text}") from e
+
+    df = df.sort_values(by=sortby, ascending=ascend).fillna("NA")
+    df["tvl"] = df["tvl"].apply(lambda x: lambda_long_number_format(x))
+    df["apy"] = df["apy"].apply(
+        lambda x: f"{str(round(x * 100, 2))} %" if isinstance(x, (int, float)) else x
+    )
+    df.columns = [x.title() for x in df.columns]
+    df.rename(columns={"Apy": "APY (%)", "Tvl": "TVL ($)"}, inplace=True)
+    return df
